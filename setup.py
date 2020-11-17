@@ -1,3 +1,10 @@
+
+"""
+Upload to PyPI
+python3 setup.py sdist
+twine upload --repository pypitest dist/python-enodo-X.X.X.tar.gz
+twine upload --repository pypi dist/python-enodo-X.X.X.tar.gz
+"""
 from setuptools import setup, find_packages
 from enodo import __version__
 
@@ -13,7 +20,7 @@ setup(
     url='https://github.com/siridb/python-enodo',
     author='Timo Janssen',
     author_email='timo@transceptor.technology',
-    license='MIT',
+    license='GPLv3',
     classifiers=[
         # How mature is this project? Common values are
         #   3 - Alpha
@@ -26,7 +33,7 @@ setup(
         'Topic :: Software Development :: Build Tools',
 
         # Pick your license as you wish (should match "license" above)
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
@@ -35,7 +42,7 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='data communication connector',
+    keywords='data communication connector enodo siridb library',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
