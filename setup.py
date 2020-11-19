@@ -7,17 +7,21 @@ twine upload --repository pypi dist/python-enodo-X.X.X.tar.gz
 """
 from setuptools import setup, find_packages
 from enodo import __version__
-
-long_description = '''
-The Endodo HUB connector can be used to communicate with the SiriDB Enodo HUB.
-'''.strip()
+try:
+    with open('README.md', 'r') as f:
+        long_description = f.read()
+except IOError:
+    long_description = '''
+    The Endodo HUB connector can be used to communicate with the SiriDB Enodo HUB.
+    '''.strip()
 
 setup(
     name='python-enodo',
     version=__version__,
     description='SiriDB Enodo Connector',
     long_description=long_description,
-    url='https://github.com/siridb/python-enodo',
+    long_description_content_type='text/markdown',
+    url='https://github.com/SiriDB/siridb-enodo-lib',
     author='Timo Janssen',
     author_email='timo@transceptor.technology',
     license='GPLv3',

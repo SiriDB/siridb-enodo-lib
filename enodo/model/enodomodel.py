@@ -1,13 +1,11 @@
 class EnodoModel:
-    __slots__ = ('model_name', 'model_arguments', 'supports_forecasting', 'supports_anomaly_detection')
+    __slots__ = ('model_name', 'model_arguments')
 
     def __init__(self, name, model_arguments):
         """
         :param name:
         :param model_arguments:  in form of  {'key': True} Where key is argument name and
                                     value is wether or not it is mandatory
-        :param supports_forecasting:
-        :param supports_anomaly_detection:
         """
         self.model_name = name
         self.model_arguments = model_arguments
