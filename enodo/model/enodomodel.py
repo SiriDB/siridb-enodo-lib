@@ -11,14 +11,14 @@ class EnodoModel:
         self.model_arguments = model_arguments
 
     @classmethod
-    async def to_dict(cls, model):
+    def to_dict(cls, model):
         return {
             'model_name': model.model_name,
             'model_arguments': model.model_arguments
         }
 
     @classmethod
-    async def from_dict(cls, model):
+    def from_dict(cls, model):
         return EnodoModel(model.get('model_name'),
                           model.get('model_arguments'))
 
