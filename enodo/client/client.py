@@ -4,6 +4,8 @@ import errno
 import fcntl
 import os
 import uuid
+import logging
+
 import qpack
 
 from enodo.exceptions import EnodoConnectionError
@@ -40,6 +42,7 @@ class Client:
         self._handshake_data_cb = None
         self._sock = None
         self._running = True
+        self._connected = False
 
     async def setup(self, cbs=None, handshake_cb=None):
         await self._connect()
@@ -71,19 +74,18 @@ class Client:
         return True
 
     async def _connect(self):
-        connected = False
-        while not connected and self._running:
-            print("Trying to connect")
+        while not self._connected and self._running:
+            logging.info("Trying to connect")
             try:
                 self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self._sock.connect((self._hostname, self._port))
             except Exception as e:
-                print("Cannot connect, ", str(e))
-                print("Retrying in 5")
+                logging.warning(f"Cannot connect, {str(e)}")
+                logging.info("Retrying in 5")
                 await asyncio.sleep(5)
             else:
-                print("Connected")
-                connected = True
+                logging.info("Connected")
+                self._connected = True
                 fcntl.fcntl(self._sock, fcntl.F_SETFL, os.O_NONBLOCK)
 
     async def run(self):
@@ -96,7 +98,7 @@ class Client:
             await asyncio.sleep(1)
 
     async def close(self):
-        print('Close the socket')
+        logging.info('Closing the socket')
         self._running = False
         self._sock.close()
 
@@ -119,28 +121,30 @@ class Client:
             data = qpack.unpackb(data, decode='utf-8')
 
         if packet_type == 0:
-            print("Connection lost, trying to reconnect")
+            logging.warning("Connection lost, trying to reconnect")
+            self._connected = False
             try:
                 await self.setup(self._cbs)
             except Exception as e:
-                print(e)
+                logging.error('Error while trying to setup client')
+                logging.debug(f'Correspondig error: {str(e)}')
                 await asyncio.sleep(5)
         elif packet_type == HANDSHAKE_OK:
-            print(f'Hands shaked with hub')
+            logging.info(f'Hands shaked with hub')
         elif packet_type == HANDSHAKE_FAIL:
-            print(f'Hub does not want to shake hands')
+            logging.warning(f'Hub does not want to shake hands')
         elif packet_type == HEARTBEAT:
-            print(f'Heartbeat back from hub')
+            logging.debug(f'Heartbeat back from hub')
         elif packet_type == RESPONSE_OK:
-            print(f'Hub received update correctly')
+            logging.debug(f'Hub received update correctly')
         elif packet_type == UNKNOWN_CLIENT:
-            print(f'Hub does not recognize us')
+            logging.error(f'Hub does not recognize us')
             await self._handshake()
         else:
             if packet_type in self._cbs.keys():
                 await self._cbs.get(packet_type)(data)
             else:
-                print(f'Message type not implemented: {packet_type}')
+                logging.error(f'Message type not implemented: {packet_type}')
 
     async def _send_message(self, length, message_type, data):
         if self._current_message_id_locked:
@@ -152,10 +156,12 @@ class Client:
         self._current_message_id += 1
         self._current_message_id_locked = False
 
-        print("SENDING TYPE: ", message_type)
+        logging.debug("Sending type: {message_type}")
         self._sock.send(header + data)
 
     async def send_message(self, body, message_type, use_qpack=True):
+        if not self._connected:
+            return False
         if use_qpack:
             body = qpack.packb(body)
         await self._send_message(len(body), message_type, body)
@@ -170,7 +176,7 @@ class Client:
         self._last_heartbeat_send = datetime.datetime.now()
 
     async def _send_heartbeat(self):
-        print('Sending heartbeat to hub')
+        logging.debug('Sending heartbeat to hub')
         id_encoded = qpack.packb(self._id)
         await self._send_message(len(id_encoded), HEARTBEAT, id_encoded)
         self._last_heartbeat_send = datetime.datetime.now()
