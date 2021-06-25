@@ -1,25 +1,27 @@
 class EnodoModel:
-    __slots__ = ('model_name', 'model_arguments')
+    __slots__ = ('name', 'model_arguments', 'supported_jobs')
 
-    def __init__(self, name, model_arguments):
+    def __init__(self, name, model_arguments, supported_jobs=[]):
         """
         :param name:
-        :param model_arguments:  in form of  {'key': True} Where key is argument name and
-                                    value is wether or not it is mandatory
+        :param model_arguments:  in form of  {'name': ..., 'required': True, 'description': ''} 
         """
-        self.model_name = name
+        self.name = name
         self.model_arguments = model_arguments
+
+        self.supported_jobs = supported_jobs
+
+    def support_job_type(self, job_type):
+        return job_type in self.supported_jobs
 
     @classmethod
     def to_dict(cls, model):
         return {
-            'model_name': model.model_name,
-            'model_arguments': model.model_arguments
+            'name': model.name,
+            'model_arguments': model.model_arguments,
+            'supported_jobs': model.supported_jobs
         }
 
     @classmethod
     def from_dict(cls, model):
-        return EnodoModel(model.get('model_name'),
-                          model.get('model_arguments'))
-
-
+        return EnodoModel(**model)

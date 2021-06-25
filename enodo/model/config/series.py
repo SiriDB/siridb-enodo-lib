@@ -40,14 +40,14 @@ class SeriesJobConfigModel(ConfigModel):
 
 class SeriesConfigModel(ConfigModel):
 
-    __slots__ = ('job_models', 'min_data_points')
+    __slots__ = ('job_models', 'min_data_points', 'realtime')
     
-    def __init__(self, job_config, min_data_points=None):
+    def __init__(self, job_config, min_data_points=None, realtime=False):
         """
         Create new Series Config
-        :param job_models: dict of job(key) and model name(value)
-        :param job_schedule: dict of job(key) and n_new_points(value)
-        :param model_params: dict of model(key) and dict(value)
+        :param job_config: dict of job(key) and config(value)
+        :param min_data_points: int value of min points before it will be analysed or used in a job
+        :param realtime: boolean if series should be analysed in realtime with datapoint updates
         :return:
         """
 
@@ -62,7 +62,11 @@ class SeriesConfigModel(ConfigModel):
         if not isinstance(min_data_points, int):
             raise Exception("Invalid series config")
 
+        if not isinstance(realtime, bool):
+            raise Exception("Invalid series config")
+
         self.min_data_points = min_data_points
+        self.realtime = realtime
 
     def get_config_for_job(self, job_type):
         if job_type not in self.job_config:
@@ -77,5 +81,6 @@ class SeriesConfigModel(ConfigModel):
     def to_dict(self):
         return {
             'job_config': {key:value.to_dict() for (key,value) in self.job_config.items()},
-            'min_data_points': self.min_data_points
+            'min_data_points': self.min_data_points,
+            'realtime': self.realtime
         }
