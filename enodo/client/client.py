@@ -175,7 +175,7 @@ class Client:
             'client_type': self._client_type,
             'token': self._token,
             'version': self._client_version
-            }
+        }
         if self._handshake_data_cb is not None:
             handshake_data = await self._handshake_data_cb()
             data = {**data, **handshake_data}
