@@ -1,7 +1,12 @@
 import json
 import logging
 from abc import ABC, abstractmethod
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES
+from enodo.jobs import (
+    JOB_TYPE_BASE_SERIES_ANALYSIS,
+    JOB_TYPE_FORECAST_SERIES,
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES
+)
+
 
 class EnodoJobDataModel():
 
@@ -9,14 +14,15 @@ class EnodoJobDataModel():
         self._dict_values = kwargs
         if not self.validate():
             raise Exception("invalid data for packaga data")
-        
+
         # self.__dict__ = json.loads(self._raw_data)
 
     def validate(self):
         if self.required_fields is not None:
             for key in self.required_fields:
                 if key not in self._dict_values.keys():
-                    logging.info(f"Missing '{key}' in enodo job data model data")
+                    logging.info(
+                        f"Missing '{key}' in enodo job data model data")
                     return False
         return "model_type" in self._dict_values.keys()
 
@@ -46,7 +52,6 @@ class EnodoJobDataModel():
             return EnodoForecastJobResponseDataModel(**data)
         elif model_type == "job_request":
             return EnodoJobRequestDataModel(**data)
-        
 
         return None
 
@@ -81,6 +86,7 @@ class EnodoForecastJobResponseDataModel(EnodoJobDataModel):
             "forecast_points"
         ]
 
+
 class EnodoDetectAnomaliesJobResponseDataModel(EnodoJobDataModel):
 
     def __init__(self, **kwargs):
@@ -93,6 +99,7 @@ class EnodoDetectAnomaliesJobResponseDataModel(EnodoJobDataModel):
             "successful",
             "flagged_anomaly_points"
         ]
+
 
 class EnodoBaseAnalysisJobResponseDataModel(EnodoJobDataModel):
 

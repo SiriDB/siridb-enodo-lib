@@ -15,14 +15,16 @@ from ..version import __version__ as VERSION
 
 class Client:
 
-    def __init__(self, loop, hostname, port, client_type, token, identity_file_path=None, heartbeat_interval=5, client_version=VERSION):
+    def __init__(self, loop, hostname, port, client_type, token,
+                 identity_file_path=None, heartbeat_interval=5,
+                 client_version=VERSION):
         self.loop = loop
         self._hostname = hostname
         self._port = port
         self._heartbeat_interval = heartbeat_interval
         self._client_type = client_type
         self._client_version = client_version
-        
+
         self._id = uuid.uuid4().hex
         if identity_file_path is not None:
             enodo_id = self.read_enodo_id(identity_file_path)
@@ -90,7 +92,8 @@ class Client:
 
     async def run(self):
         while self._running:
-            if (datetime.datetime.now() - self._last_heartbeat_send).total_seconds() > int(
+            diff = datetime.datetime.now() - self._last_heartbeat_send
+            if diff.total_seconds() > int(
                     self._heartbeat_interval):
                 await self._send_heartbeat()
 
@@ -167,7 +170,12 @@ class Client:
         await self._send_message(len(body), message_type, body)
 
     async def _handshake(self):
-        data = {'client_id': str(self._id), 'client_type': self._client_type, 'token': self._token, 'version': self._client_version}
+        data = {
+            'client_id': str(self._id),
+            'client_type': self._client_type,
+            'token': self._token,
+            'version': self._client_version
+            }
         if self._handshake_data_cb is not None:
             handshake_data = await self._handshake_data_cb()
             data = {**data, **handshake_data}

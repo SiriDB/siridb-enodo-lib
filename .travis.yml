@@ -1,0 +1,10 @@
+matrix:
+  include:
+    - language: python
+      dist: xenial   # required for Python >= 3.7
+      python:
+        - "3.8"
+      before_install:
+        - pip install pycodestyle
+      script:
+        - find . -name \*.py -exec pycodestyle {} +
