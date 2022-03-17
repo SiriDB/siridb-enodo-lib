@@ -156,7 +156,7 @@ class Client:
         self._current_message_id += 1
         self._current_message_id_locked = False
 
-        logging.debug("Sending type: {message_type}")
+        logging.debug(f"Sending type: {message_type}")
         self._sock.send(header + data)
 
     async def send_message(self, body, message_type, use_qpack=True):
