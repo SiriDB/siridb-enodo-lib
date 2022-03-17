@@ -2,6 +2,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES
+from enodo.model.config.base import ConfigModel
 
 class EnodoJobDataModel():
 
@@ -28,8 +29,18 @@ class EnodoJobDataModel():
     def get(self, key):
         return self._dict_values.get(key)
 
+    def _children_to_dict(self):
+        r = {}
+        for key, child in self._dict_values.items():
+            if isinstance(child, ConfigModel):
+                r[key] = child.to_dict()
+            else:
+                r[key] = child
+
+        return r
+
     def serialize(self):
-        return json.dumps(self._dict_values)
+        return json.dumps(self._children_to_dict())
 
     @classmethod
     def unserialize(cls, json_data):
@@ -61,10 +72,9 @@ class EnodoJobRequestDataModel(EnodoJobDataModel):
     def required_fields(self):
         return [
             "job_id",
-            "job_type",
             "series_name",
-            "series_config",
-            "global_series_config"
+            "job_config",
+            "series_config"
         ]
 
 
