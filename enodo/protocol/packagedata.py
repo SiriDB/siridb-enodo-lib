@@ -104,7 +104,7 @@ class EnodoJobRequestDataModel(EnodoJobDataModel):
         ]
 
     # TODO add optional fields for explicity
-    ## Optional: required_job_config
+    # Optional: required_job_config
 
 
 class EnodoForecastJobResponseDataModel(EnodoJobDataModel):
@@ -171,5 +171,5 @@ class EnodoStaticRulesJobResponseDataModel(EnodoJobDataModel):
         for failed_check in data['failed_checks']:
             if not isinstance(failed_check, list):
                 return False
-        
+
         return True
