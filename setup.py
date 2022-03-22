@@ -23,7 +23,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/SiriDB/siridb-enodo-lib',
     author='Timo Janssen',
-    author_email='timo@transceptor.technology',
+    author_email='timo@cesbit.com',
     license='GPLv3',
     classifiers=[
         # How mature is this project? Common values are
