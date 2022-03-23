@@ -7,8 +7,8 @@ class EnodoModel:
             job_load_weight={}):
         """
         :param name:
-        :param model_arguments:  in form of  
-                {'name': ..., 'required': True, 'description': ''} 
+        :param model_arguments:  in form of
+                {'name': ..., 'required': True, 'description': ''}
         """
         self.name = name
         self.model_arguments = model_arguments
