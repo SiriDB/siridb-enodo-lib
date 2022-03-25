@@ -29,7 +29,7 @@ class EnodoJobDataModel():
         """ return list of required fields """
 
     @abstractmethod
-    def validate_data(self):
+    def validate_data(self, data):
         """ validate data """
         return True
 
