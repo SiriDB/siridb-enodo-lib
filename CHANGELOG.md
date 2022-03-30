@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.7] - 2022-03-30
+
+### Changed
+- Changed job response structure and valdiation
+
 ## [0.2.5] - 2022-03-25
 
 ### Fixed
