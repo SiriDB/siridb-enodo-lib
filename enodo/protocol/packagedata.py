@@ -1,6 +1,6 @@
 import json
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enodo.model.config.base import ConfigModel
 
 
@@ -15,10 +15,12 @@ class EnodoJobDataModel():
 
     def validate(self):
         if self.required_fields is not None:
+            if "errors" in self._dict_values.keys():
+                return True
             for key in self.required_fields:
                 if key not in self._dict_values.keys():
-                    logging.info(f"Missing '{key}' in enodo "
-                                 "job data model data")
+                    logging.error(f"Missing '{key}' in enodo "
+                                  "job data model data")
                     return False
         return "model_type" in self._dict_values.keys() and \
             self.validate_data(self._dict_values)
@@ -28,8 +30,7 @@ class EnodoJobDataModel():
     def required_fields(self):
         """ return list of required fields """
 
-    @abstractmethod
-    def validate_data(self):
+    def validate_data(self, data):
         """ validate data """
         return True
 
@@ -68,8 +69,7 @@ class EnodoJobDataModel():
         return None
 
     @classmethod
-    def validate_by_job_type(cls, json_data, job_type):
-        data = json.loads(json_data)
+    def validate_by_job_type(cls, data, job_type):
 
         try:
             if job_type == "job_forecast":
@@ -117,7 +117,7 @@ class EnodoForecastJobResponseDataModel(EnodoJobDataModel):
     def required_fields(self):
         return [
             "successful",
-            "forecast_points"
+            "data"
         ]
 
 
@@ -131,7 +131,7 @@ class EnodoDetectAnomaliesJobResponseDataModel(EnodoJobDataModel):
     def required_fields(self):
         return [
             "successful",
-            "flagged_anomaly_points"
+            "data"
         ]
 
 
@@ -145,10 +145,8 @@ class EnodoBaseAnalysisJobResponseDataModel(EnodoJobDataModel):
     def required_fields(self):
         return [
             "successful",
-            "trend_slope_value",
-            "noise_value",
-            "has_seasonality",
-            "health_of_series"
+            "characteristics",
+            "health"
         ]
 
 
@@ -161,14 +159,15 @@ class EnodoStaticRulesJobResponseDataModel(EnodoJobDataModel):
     @property
     def required_fields(self):
         return [
-            "failed_checks"
+            "successful",
+            "data"
         ]
 
     def validate_data(self, data):
-        if not isinstance(data['failed_checks'], list):
+        if not isinstance(data['data'], list):
             return False
 
-        for failed_check in data['failed_checks']:
+        for failed_check in data['data']:
             if not isinstance(failed_check, list):
                 return False
 
