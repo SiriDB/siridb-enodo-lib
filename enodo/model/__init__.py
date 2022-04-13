@@ -1,1 +1,1 @@
-from .enodomodel import EnodoModel
+from .enodomodule import EnodoModule, EnodoModuleArgument

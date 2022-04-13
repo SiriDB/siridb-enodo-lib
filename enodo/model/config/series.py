@@ -1,45 +1,28 @@
-import json
 import uuid
 
-from . import ConfigModel
 from enodo.jobs import (
-    JOB_TYPE_BASE_SERIES_ANALYSIS,
-    JOB_TYPE_STATIC_RULES,
     JOB_TYPES,
-    JOB_TYPE_FORECAST_SERIES,
-    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
     JOB_STATUS_NONE,
 )
 
 
-class SeriesJobConfigModel(ConfigModel):
-    __slots__ = (
-        'activated',
-        'model',
-        'job_type',
-        'job_schedule_type',
-        'job_schedule',
-        'model_params',
-        'config_name',
-        'silenced',
-        'requires_job',
-        'job_last_run',
-    )
+class SeriesJobConfigModel(dict):
 
-    def __init__(self, model, job_type, job_schedule_type, job_schedule,
-                 model_params, activated=True, config_name=None,
-                 silenced=False, requires_job=None, job_last_run=None):
+    def __init__(self, module, job_type, job_schedule_type, job_schedule,
+                 module_params, activated=True, config_name=None,
+                 silenced=False, requires_job=None):
 
         if not isinstance(activated, bool):
             raise Exception(
                 "Invalid series job config, activated property must be a bool")
 
-        if not isinstance(model, str):
+        if not isinstance(module, str):
             raise Exception(
-                "Invalid series job config, model property must be a string")
+                "Invalid series job config, module property must be a string")
 
         if job_type not in JOB_TYPES:
-            raise Exception("Invalid series job config, unknown job_type")
+            raise Exception(
+                "Invalid series job config, unknown job_type")
 
         if not isinstance(job_schedule_type, str):
             raise Exception(
@@ -56,10 +39,10 @@ class SeriesJobConfigModel(ConfigModel):
                 "Invalid series job config, "
                 "job_schedule property must be an integer")
 
-        if not isinstance(model_params, dict):
+        if not isinstance(module_params, dict):
             raise Exception(
                 "Invalid series job config, "
-                "model_params property must be a dict")
+                "module_params property must be a dict")
 
         if not isinstance(silenced, bool):
             raise Exception(
@@ -69,42 +52,58 @@ class SeriesJobConfigModel(ConfigModel):
         if config_name is None:
             config_name = str(uuid.uuid4())
 
-        self.activated = activated
-        self.model = model
-        self.job_type = job_type
-        self.job_schedule_type = job_schedule_type
-        self.job_schedule = job_schedule
-        self.model_params = model_params
-        self.config_name = config_name
-        self.silenced = silenced
-        self.requires_job = requires_job
+        super(SeriesJobConfigModel, self).__init__({
+            "activated": activated,
+            "module": module,
+            "job_type": job_type,
+            "job_schedule_type": job_schedule_type,
+            "job_schedule": job_schedule,
+            "module_params": module_params,
+            "config_name": config_name,
+            "silenced": silenced,
+            "requires_job": requires_job})
 
-        self.job_last_run = None
+    @property
+    def activated(self):
+        return self.get("activated")
 
-    @classmethod
-    def from_dict(cls, data):
-        return cls(**data)
+    @property
+    def module(self):
+        return self.get("module")
 
-    def to_dict(self):
-        return {
-            'activated': self.activated,
-            'model': self.model,
-            'job_type': self.job_type,
-            'job_schedule_type': self.job_schedule_type,
-            'job_schedule': self.job_schedule,
-            'model_params': self.model_params,
-            'config_name': self.config_name,
-            'silenced': self.silenced,
-            'requires_job': self.requires_job,
-            'job_last_run': self.job_last_run
-        }
+    @property
+    def job_type(self):
+        return self.get("job_type")
+
+    @property
+    def job_schedule_type(self):
+        return self.get("job_schedule_type")
+
+    @property
+    def job_schedule(self):
+        return self.get("job_schedule")
+
+    @property
+    def module_params(self):
+        return self.get("module_params")
+
+    @property
+    def config_name(self):
+        return self.get("config_name")
+
+    @property
+    def silenced(self):
+        return self.get("silenced")
+
+    @property
+    def requires_job(self):
+        return self.get("requires_job")
 
 
-class SeriesConfigModel(ConfigModel):
+class SeriesConfigModel(dict):
 
-    __slots__ = ('job_config', 'min_data_points', 'realtime')
-
-    def __init__(self, job_config, min_data_points=None, realtime=False):
+    def __init__(
+            self, job_config, min_data_points=None, realtime=False):
         """
         Create new Series Config
         :param job_config: dict of job(key) and config(value)
@@ -119,10 +118,10 @@ class SeriesConfigModel(ConfigModel):
             raise Exception(
                 "Invalid series config, job_config property must be a list")
 
-        self.job_config = {}
+        self._job_config = {}
         for job in job_config:
-            jmc = SeriesJobConfigModel.from_dict(job)
-            self.job_config[jmc.config_name] = jmc
+            jmc = SeriesJobConfigModel(**job)
+            self._job_config[jmc.config_name] = jmc
 
         if not isinstance(min_data_points, int):
             raise Exception(
@@ -133,12 +132,26 @@ class SeriesConfigModel(ConfigModel):
             raise Exception(
                 "Invalid series config, realtime property must be a bool")
 
-        self.min_data_points = min_data_points
-        self.realtime = realtime
+        super(SeriesConfigModel, self).__init__({
+            "job_config": job_config,
+            "min_data_points": min_data_points,
+            "realtime": realtime})
+
+    @property
+    def job_config(self):
+        return self._job_config
+
+    @property
+    def min_data_points(self):
+        return self.get("min_data_points")
+
+    @property
+    def realtime(self):
+        return self.get("realtime")
 
     def get_config_for_job_type(self, job_type, first_only=True):
         r = []
-        for job in self.job_config.values():
+        for job in self._job_config.values():
             if job.job_type == job_type:
                 r.append(job)
 
@@ -147,22 +160,10 @@ class SeriesConfigModel(ConfigModel):
         return r
 
     def get_config_for_job(self, job_config_name):
-        return self.job_config.get(job_config_name)
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(**data)
-
-    def to_dict(self):
-        return {
-            'job_config': [
-                value.to_dict() for value in self.job_config.values()],
-            'min_data_points': self.min_data_points,
-            'realtime': self.realtime
-        }
+        return self._job_config.get(job_config_name)
 
 
-class JobSchedule:
+class JobSchedule(dict):
 
     def __init__(self, schedule=None):
 
@@ -175,26 +176,19 @@ class JobSchedule:
                 if "value" not in schedule or "type" not in schedule:
                     raise Exception("Invalid series job schedule")
 
-        self.schedule = schedule
+        super(JobSchedule, self).__init__(schedule)
 
     def get_job_schedule(self, job_config_name):
-        return self.schedule.get(job_config_name, None)
+        return self.get(job_config_name, None)
 
     def set_job_schedule(self, job_config_name, value):
-        if job_config_name not in self.schedule:
-            self.schedule[job_config_name] = {}
+        if job_config_name not in self:
+            self[job_config_name] = {}
 
-        self.schedule[job_config_name] = value
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data)
-
-    def to_dict(self):
-        return self.schedule
+        self[job_config_name] = value
 
 
-class JobStatuses:
+class JobStatuses(dict):
 
     def __init__(self, statuses=None):
 
@@ -202,42 +196,97 @@ class JobStatuses:
             statuses = {}
         else:
             if not isinstance(statuses, dict):
-                raise Exception("Invalid series job schedule")
+                raise Exception("Invalid series job statuses")
 
-        self.statuses = statuses
+        super(JobStatuses, self).__init__(statuses)
 
     def get_job_status(self, job_config_name):
-        return self.statuses.get(job_config_name, JOB_STATUS_NONE)
+        return self.get(job_config_name, JOB_STATUS_NONE)
 
     def set_job_status(self, job_config_name, value):
-        self.statuses[job_config_name] = value
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data)
-
-    def to_dict(self):
-        return self.statuses
+        self[job_config_name] = value
 
 
-class SeriesState:
+class JobCheckStatuses(dict):
 
-    __slots__ = ('datapoint_count', 'health', 'job_schedule', 'job_statuses')
+    def __init__(self, statuses=None):
+
+        if statuses is None:
+            statuses = {}
+        else:
+            if not isinstance(statuses, dict):
+                raise Exception("Invalid series job check statuses")
+
+        super(JobCheckStatuses, self).__init__(statuses)
+
+    def get_job_check_status(self, job_config_name):
+        return self.get(job_config_name, "")
+
+    def set_job_check_status(self, job_config_name, status_mesage):
+        self[job_config_name] = status_mesage
+
+
+class SeriesState(dict):
 
     def __init__(
             self,
             datapoint_count=None,
             health=None,
             job_schedule=None,
+            job_check_statuses=None,
             job_statuses=None):
 
         job_schedule = JobSchedule(job_schedule)
         job_statuses = JobStatuses(job_statuses)
+        job_check_statuses = JobCheckStatuses(job_check_statuses)
 
-        self.datapoint_count = datapoint_count
-        self.health = health
-        self.job_schedule = job_schedule
-        self.job_statuses = job_statuses
+        super(SeriesState, self).__init__({
+            "datapoint_count": datapoint_count,
+            "health": health,
+            "job_schedule": job_schedule,
+            "job_statuses": job_statuses,
+            "job_check_statuses": job_check_statuses
+        })
+
+    @property
+    def datapoint_count(self):
+        return self.get("datapoint_count")
+
+    @datapoint_count.setter
+    def datapoint_count(self, value):
+        self["datapoint_count"] = value
+
+    @property
+    def health(self):
+        return self.get("health")
+
+    @health.setter
+    def health(self, value):
+        self["health"] = value
+
+    @property
+    def job_schedule(self):
+        return self.get("job_schedule")
+
+    @job_schedule.setter
+    def job_schedule(self, value):
+        self["job_schedule"] = value
+
+    @property
+    def job_statuses(self):
+        return self.get("job_statuses")
+
+    @job_statuses.setter
+    def job_statuses(self, value):
+        self["job_statuses"] = value
+
+    @property
+    def job_check_statuses(self):
+        return self.get("job_check_statuses")
+
+    @job_check_statuses.setter
+    def job_check_statuses(self, value):
+        self["job_check_statuses"] = value
 
     def get_job_status(self, job_config_name):
         return self.job_statuses.get_job_status(job_config_name)
@@ -246,22 +295,20 @@ class SeriesState:
         return self.job_statuses.set_job_status(job_config_name, value)
 
     def get_all_job_schedules(self):
-        return self.job_schedule.schedule
+        return self.job_schedule
 
     def get_job_schedule(self, job_config_name):
         return self.job_schedule.get_job_schedule(job_config_name)
 
     def set_job_schedule(self, job_config_name, value):
-        return self.job_schedule.set_job_schedule(job_config_name, value)
+        return self.job_schedule.set_job_schedule(
+            job_config_name, value)
 
-    @classmethod
-    def from_dict(cls, data):
-        return cls(**data)
+    def get_job_check_status(self, job_config_name):
+        return self.job_check_statuses.get_job_check_status(
+            job_config_name)
 
-    def to_dict(self):
-        return {
-            'datapoint_count': self.datapoint_count,
-            'health': self.health,
-            'job_schedule': self.job_schedule.to_dict(),
-            'job_statuses': self.job_statuses.to_dict()
-        }
+    def set_job_check_status(self, job_config_name, status_message):
+        return self.job_check_statuses.set_job_check_status(
+            job_config_name,
+            status_message)

@@ -8,4 +8,4 @@
 # SiriDB Enodo Lib
 This library is used for the SiriDB Enodo platform for internal communication. When setting up the [Hub](https://github.com/SiriDB/siridb-enodo-hub), [Worker](https://github.com/SiriDB/siridb-enodo-worker) and [Listener](https://github.com/SiriDB/siridb-enodo-listener) this lib is used.
 
-The library enholds the protocol settings, package id's and package data formats by models
+The library enholds the protocol settings, package id's and package data formats by modules

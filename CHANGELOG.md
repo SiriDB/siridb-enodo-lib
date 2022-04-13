@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.10] - 2022-04-13
+
+### Changed
+- Cleanup
+- Renamed model to module
+
 ## [0.2.7] - 2022-03-30
 
 ### Changed
@@ -20,7 +26,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [0.2.4] - 2022-03-23
 
 ### Added
-- Added support for a model's job load weight data
+- Added support for a module's job load weight data
 
 ## [0.2.3] - 2022-03-22
 

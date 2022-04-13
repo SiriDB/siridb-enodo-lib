@@ -1,7 +1,6 @@
 import json
 import logging
 from abc import abstractmethod
-from enodo.model.config.base import ConfigModel
 
 
 class EnodoJobDataModel():
@@ -10,8 +9,6 @@ class EnodoJobDataModel():
         self._dict_values = kwargs
         if not self.validate():
             raise Exception("invalid data for packaga data")
-
-        # self.__dict__ = json.loads(self._raw_data)
 
     def validate(self):
         if self.required_fields is not None:
@@ -40,10 +37,7 @@ class EnodoJobDataModel():
     def _children_to_dict(self):
         r = {}
         for key, child in self._dict_values.items():
-            if isinstance(child, ConfigModel):
-                r[key] = child.to_dict()
-            else:
-                r[key] = child
+            r[key] = child
 
         return r
 
