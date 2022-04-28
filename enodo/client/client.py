@@ -35,8 +35,6 @@ class Client:
 
         self._token = token
         self._messages = {}
-        self._current_message_id = 1
-        self._current_message_id_locked = False
 
         self._last_heartbeat_send = datetime.datetime.now()
         self._updates_on_heartbeat = []
@@ -150,14 +148,7 @@ class Client:
                 logging.error(f'Message type not implemented: {packet_type}')
 
     async def _send_message(self, length, message_type, data):
-        if self._current_message_id_locked:
-            while self._current_message_id_locked:
-                await asyncio.sleep(0.1)
-
-        self._current_message_id_locked = True
-        header = create_header(length, message_type, self._current_message_id)
-        self._current_message_id += 1
-        self._current_message_id_locked = False
+        header = create_header(length, message_type)
 
         logging.debug(f"Sending type: {message_type}")
         self._sock.send(header + data)
