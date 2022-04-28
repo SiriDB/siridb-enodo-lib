@@ -50,7 +50,7 @@ async def read_packet(sock, header_data=None):
         return packet_type, packet_id, await sock.read(body_size)
 
 
-def create_header(size, type, id):
+def create_header(size, type, id=1):
     return \
         size.to_bytes(4, byteorder='big') + \
         type.to_bytes(1, byteorder='big') + \

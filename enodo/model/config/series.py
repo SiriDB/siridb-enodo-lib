@@ -8,9 +8,9 @@ from enodo.jobs import (
 
 class SeriesJobConfigModel(dict):
 
-    def __init__(self, module, job_type, job_schedule_type, job_schedule,
-                 module_params, activated=True, config_name=None,
-                 silenced=False, requires_job=None):
+    def __init__(self, module, job_type, job_schedule_type,
+                 job_schedule, module_params, activated=True,
+                 config_name=None, silenced=False, requires_job=None):
 
         if not isinstance(activated, bool):
             raise Exception(
@@ -118,10 +118,10 @@ class SeriesConfigModel(dict):
             raise Exception(
                 "Invalid series config, job_config property must be a list")
 
-        self._job_config = {}
+        _job_config_list = []
         for job in job_config:
             jmc = SeriesJobConfigModel(**job)
-            self._job_config[jmc.config_name] = jmc
+            _job_config_list.append(jmc)
 
         if not isinstance(min_data_points, int):
             raise Exception(
@@ -133,13 +133,16 @@ class SeriesConfigModel(dict):
                 "Invalid series config, realtime property must be a bool")
 
         super(SeriesConfigModel, self).__init__({
-            "job_config": job_config,
+            "job_config": _job_config_list,
             "min_data_points": min_data_points,
             "realtime": realtime})
 
     @property
     def job_config(self):
-        return self._job_config
+        _job_config = {}
+        for jmc in self['job_config']:
+            _job_config[jmc.config_name] = jmc
+        return _job_config
 
     @property
     def min_data_points(self):
@@ -151,7 +154,7 @@ class SeriesConfigModel(dict):
 
     def get_config_for_job_type(self, job_type, first_only=True):
         r = []
-        for job in self._job_config.values():
+        for job in self['job_config']:
             if job.job_type == job_type:
                 r.append(job)
 
@@ -160,7 +163,7 @@ class SeriesConfigModel(dict):
         return r
 
     def get_config_for_job(self, job_config_name):
-        return self._job_config.get(job_config_name)
+        return self.job_config.get(job_config_name)
 
 
 class JobSchedule(dict):
@@ -172,10 +175,9 @@ class JobSchedule(dict):
         else:
             if not isinstance(schedule, dict):
                 raise Exception("Invalid series job schedule")
-            for job_config_name, schedule in schedule.items():
-                if "value" not in schedule or "type" not in schedule:
+            for job_config_name, schedule_item in schedule.items():
+                if "value" not in schedule_item or "type" not in schedule_item:
                     raise Exception("Invalid series job schedule")
-
         super(JobSchedule, self).__init__(schedule)
 
     def get_job_schedule(self, job_config_name):
@@ -236,9 +238,11 @@ class SeriesState(dict):
             job_check_statuses=None,
             job_statuses=None):
 
+        print(job_schedule, job_statuses)
         job_schedule = JobSchedule(job_schedule)
         job_statuses = JobStatuses(job_statuses)
         job_check_statuses = JobCheckStatuses(job_check_statuses)
+        print(job_schedule, job_statuses)
 
         super(SeriesState, self).__init__({
             "datapoint_count": datapoint_count,
@@ -289,26 +293,25 @@ class SeriesState(dict):
         self["job_check_statuses"] = value
 
     def get_job_status(self, job_config_name):
-        return self.job_statuses.get_job_status(job_config_name)
+        return self['job_statuses'].get_job_status(job_config_name)
 
     def set_job_status(self, job_config_name, value):
-        return self.job_statuses.set_job_status(job_config_name, value)
+        self['job_statuses'].set_job_status(job_config_name, value)
 
     def get_all_job_schedules(self):
-        return self.job_schedule
+        return self['job_schedule']
 
     def get_job_schedule(self, job_config_name):
-        return self.job_schedule.get_job_schedule(job_config_name)
+        return self['job_schedule'].get_job_schedule(job_config_name)
 
     def set_job_schedule(self, job_config_name, value):
-        return self.job_schedule.set_job_schedule(
-            job_config_name, value)
+        self['job_schedule'].set_job_schedule(job_config_name, value)
 
     def get_job_check_status(self, job_config_name):
-        return self.job_check_statuses.get_job_check_status(
+        return self['job_check_statuses'].get_job_check_status(
             job_config_name)
 
     def set_job_check_status(self, job_config_name, status_message):
-        return self.job_check_statuses.set_job_check_status(
+        self['job_check_statuses'].set_job_check_status(
             job_config_name,
             status_message)
