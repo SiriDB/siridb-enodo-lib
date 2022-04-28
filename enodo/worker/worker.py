@@ -198,7 +198,7 @@ class Worker:
         if len(self._modules.keys()) < 1:
             logging.error("No modules loaded")
             return
-        
+
         self._loop = asyncio.get_running_loop()
 
         signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
