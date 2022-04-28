@@ -185,10 +185,10 @@ class Worker:
         return {'busy': self._busy,
                 'modules': serialized_modules}
 
-    def load_module(self, base_dir, module_dir_name):
-        # Get installed modules
-        modules = module_load(base_dir, module_dir_name)
-        logging.info("Loading installed analysis modules:")
+    def load_module(self, base_dir):
+        # Get installed module
+        modules = module_load(base_dir)
+        logging.info("Loading installed analysis module:")
         for module_name, module_class in modules.items():
             self._modules[module_name] = module_class.get_module_info()
             self._module_classes[module_name] = module_class
@@ -196,7 +196,7 @@ class Worker:
 
     async def start_worker(self):
         if len(self._modules.keys()) < 1:
-            logging.error("No modules loaded")
+            logging.error("No module loaded")
             return
 
         self._loop = asyncio.get_running_loop()
