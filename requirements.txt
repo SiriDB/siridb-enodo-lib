@@ -1,6 +1,5 @@
 qpack==0.0.19
 func_timeout==4.3.5
 pandas==1.4.1
-python_enodo==0.2.10
 siridb-connector==2.0.8
 statsmodels==0.13.2
