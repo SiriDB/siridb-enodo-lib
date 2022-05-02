@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import traceback
 
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, \
@@ -45,15 +44,33 @@ class Analyser:
 
     async def execute_job(self, job_data):
         series_name = job_data.get("series_name")
+        series_state = job_data.get("series_state")
         job_config = SeriesJobConfigModel(**job_data.get('job_config'))
+        max_n_points = job_config.get('max_n_points')
+        time_unit = job_data.get("time_unit")
         job_type = job_config.job_type
+        timeval = None
+
+        time_unit = (await self._siridb_data_client.run_query(
+            "show time_precision"))["data"][0]["value"]
+
         series_data = await self._siridb_data_client.query_series_data(
-            series_name)
+            series_name, since=timeval)
+
+        # if max_n_points is not None and \
+        #         series_state.get("interval") is not None and \
+        #         time_unit is not None:
+        #     timeval = max_n_points * int(series_state.get("interval"))
+        #     if time_unit == "ms":
+        #         timeval = int(timeval / 1000)
+        #     timeval = int(timeval / 60)  # In minutes
+
         if series_name not in series_data:
             return self._analyser_queue.put(
                 {'name': series_name,
                  'error': 'Cannot find series data'})
-        dataset = series_data[series_name]
+        # TODO: use tail function
+        dataset = series_data[series_name][-1000:]
         parameters = job_config.module_params
 
         module_class = self._modules.get(job_config.module)
@@ -168,7 +185,8 @@ async def _save_start_with_timeout(queue, job_data,
                       f'exception class: {e.__class__.__name__}')
 
 
-def start_analysing(queue, job_data, siridb_data, siridb_output, modules):
+def start_analysing(
+        queue, job_data, siridb_data, siridb_output, modules):
     """Switch to new event loop and run forever"""
 
     try:
