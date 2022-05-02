@@ -9,8 +9,9 @@ from enodo.jobs import (
 class SeriesJobConfigModel(dict):
 
     def __init__(self, module, job_type, job_schedule_type,
-                 job_schedule, module_params, activated=True,
-                 config_name=None, silenced=False, requires_job=None):
+                 job_schedule, module_params, max_n_points=None,
+                 activated=True, config_name=None, silenced=False,
+                 requires_job=None):
 
         if not isinstance(activated, bool):
             raise Exception(
@@ -44,6 +45,11 @@ class SeriesJobConfigModel(dict):
                 "Invalid series job config, "
                 "module_params property must be a dict")
 
+        if max_n_points is not None and not isinstance(max_n_points, int):
+            raise Exception(
+                "Invalid series job config, "
+                "max_n_points property must be an integer")
+
         if not isinstance(silenced, bool):
             raise Exception(
                 "Invalid series job config, "
@@ -58,6 +64,7 @@ class SeriesJobConfigModel(dict):
             "job_type": job_type,
             "job_schedule_type": job_schedule_type,
             "job_schedule": job_schedule,
+            "max_n_points": max_n_points,
             "module_params": module_params,
             "config_name": config_name,
             "silenced": silenced,
@@ -82,6 +89,10 @@ class SeriesJobConfigModel(dict):
     @property
     def job_schedule(self):
         return self.get("job_schedule")
+
+    @property
+    def max_n_points(self):
+        return self.get("max_n_points")
 
     @property
     def module_params(self):
@@ -234,19 +245,19 @@ class SeriesState(dict):
             self,
             datapoint_count=None,
             health=None,
+            interval=None,
             job_schedule=None,
             job_check_statuses=None,
             job_statuses=None):
 
-        print(job_schedule, job_statuses)
         job_schedule = JobSchedule(job_schedule)
         job_statuses = JobStatuses(job_statuses)
         job_check_statuses = JobCheckStatuses(job_check_statuses)
-        print(job_schedule, job_statuses)
 
         super(SeriesState, self).__init__({
             "datapoint_count": datapoint_count,
             "health": health,
+            "interval": interval,
             "job_schedule": job_schedule,
             "job_statuses": job_statuses,
             "job_check_statuses": job_check_statuses
@@ -267,6 +278,14 @@ class SeriesState(dict):
     @health.setter
     def health(self, value):
         self["health"] = value
+
+    @property
+    def interval(self):
+        return self.get("interval")
+
+    @interval.setter
+    def interval(self, value):
+        self["interval"] = value
 
     @property
     def job_schedule(self):

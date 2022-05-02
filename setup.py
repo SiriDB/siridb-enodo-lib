@@ -44,7 +44,6 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
-
     # What does your project relate to?
     keywords='data communication connector enodo siridb library',
 

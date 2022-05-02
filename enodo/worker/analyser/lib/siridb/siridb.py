@@ -36,12 +36,17 @@ class SiriDB:
         return count
 
     # @classmethod
-    async def query_series_data(self, series_name, selector="*"):
+    async def query_series_data(self, series_name, selector="*",
+                                since=None):
+
+        query = f'select {selector} from "{series_name}"'
+        if since is not None:
+            query = (f'select {selector} from "{series_name}" '
+                     f'after now - {since}m')
         await self.siri.connect()
         result = None
         try:
-            result = await self.siri.query(
-                f'select {selector} from "{series_name}"')
+            result = await self.siri.query(query)
         except (QueryError, InsertError, ServerError, PoolError,
                 AuthenticationError, UserAuthError) as e:
             logging.error('Connection problem with SiriDB server')

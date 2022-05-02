@@ -94,7 +94,8 @@ class EnodoJobRequestDataModel(EnodoJobDataModel):
             "job_id",
             "series_name",
             "job_config",
-            "series_config"
+            "series_config",
+            "series_state"
         ]
 
     # TODO add optional fields for explicity

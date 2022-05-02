@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.15] - 2022-05-02
+
+### Added
+- Added job config property max_n_points
+
+## [0.2.13] - 2022-04-29
+
+### Fixed
+- Fix requirements
+
 ## [0.2.10] - 2022-04-13
 
 ### Changed
