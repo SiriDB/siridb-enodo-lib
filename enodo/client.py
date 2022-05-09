@@ -56,28 +56,24 @@ class Client:
         await self._handshake()
 
     def read_enodo_id(self, path):
-        try:
-            f = open(path, "r")
-            enodo_id = f.read()
-            f.close()
+        enodo_id = os.getenv(f"ENODO_ID")
+        if not (enodo_id is None or enodo_id == ""):
             return enodo_id
-        except Exception as _:
-            return None
+        with open(path, 'r') as f:
+            enodo_id = f.read()
+        return enodo_id
 
     def write_enodo_id(self, path, enodo_id):
-        try:
-            f = open(path, "w")
+        with open(path, 'w') as f:
             f.write(enodo_id)
-            f.close()
-        except Exception as _:
-            return False
         return True
 
     async def _connect(self):
         while not self._connected and self._running:
             logging.info("Trying to connect")
             try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._sock = socket.socket(
+                    socket.AF_INET, socket.SOCK_STREAM)
                 self._sock.connect((self._hostname, self._port))
             except Exception as e:
                 logging.warning(f"Cannot connect, {str(e)}")
@@ -145,7 +141,8 @@ class Client:
             if packet_type in self._cbs.keys():
                 await self._cbs.get(packet_type)(data)
             else:
-                logging.error(f'Message type not implemented: {packet_type}')
+                logging.error(
+                    f'Message type not implemented: {packet_type}')
 
     async def _send_message(self, length, message_type, data):
         header = create_header(length, message_type)

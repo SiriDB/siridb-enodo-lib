@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.16] - 2022-05-09
+
+### Changed
+- Refactored structure
+
+### Added
+- Support for Enodo ID via ENV variable `ENODO_ID`
+
 ## [0.2.15] - 2022-05-02
 
 ### Added
