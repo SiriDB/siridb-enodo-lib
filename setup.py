@@ -44,6 +44,13 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
+    install_requires=[
+        'qpack',
+        'func_timeout',
+        'pandas',
+        'siridb-connector',
+        'statsmodels',
+    ],
     # What does your project relate to?
     keywords='data communication connector enodo siridb library',
 
