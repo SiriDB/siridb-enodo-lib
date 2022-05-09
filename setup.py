@@ -12,7 +12,7 @@ try:
         long_description = f.read()
 except IOError:
     long_description = '''
-The Endodo HUB connector can be used to communicate with the SiriDB Enodo HUB.
+The Enodo HUB connector can be used to communicate with the SiriDB Enodo HUB.
     '''.strip()
 
 setup(

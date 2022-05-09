@@ -9,8 +9,8 @@ import logging
 import qpack
 
 from enodo.exceptions import EnodoConnectionError
-from ..protocol.package import *
-from ..version import __version__ as VERSION
+from .protocol.package import *
+from .version import __version__ as VERSION
 
 
 class Client:
@@ -24,7 +24,6 @@ class Client:
         self._heartbeat_interval = heartbeat_interval
         self._client_type = client_type
         self._client_version = client_version
-
         self._id = uuid.uuid4().hex
         if identity_file_path is not None:
             enodo_id = self.read_enodo_id(identity_file_path)
