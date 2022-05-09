@@ -45,9 +45,10 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     install_requires=[
-        'qpack',
         'func_timeout',
+        'numpy',
         'pandas',
+        'qpack',
         'siridb-connector',
         'statsmodels',
     ],
