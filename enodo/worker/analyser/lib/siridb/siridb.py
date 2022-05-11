@@ -6,7 +6,7 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
 
 
 def config_equals(a, b):
-    if a.get('username') != b.get('username'):
+    if a.get('user') != b.get('user'):
         return False
     if a.get('password') != b.get('password'):
         return False
