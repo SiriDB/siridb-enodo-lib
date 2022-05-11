@@ -58,6 +58,8 @@ class Client:
         enodo_id = os.getenv(f"ENODO_ID")
         if not (enodo_id is None or enodo_id == ""):
             return enodo_id
+        if not os.path.exists(path):
+            return None
         with open(path, 'r') as f:
             enodo_id = f.read()
         return enodo_id

@@ -8,7 +8,7 @@ from enodo.jobs import JOB_TYPE_FORECAST_SERIES, \
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import EnodoJobDataModel
 
-from .lib.siridb.siridb import SiriDB
+from .lib.siridb.siridb import SiriDB, config_equals
 
 
 class Analyser:
@@ -27,7 +27,7 @@ class Analyser:
             siridb_data['database'],
             siridb_data['host'],
             siridb_data['port'])
-        if siridb_output != siridb_data:
+        if not config_equals(siridb_data, siridb_output):
             self._siridb_output_client = SiriDB(
                 siridb_output['user'],
                 siridb_output['password'],
