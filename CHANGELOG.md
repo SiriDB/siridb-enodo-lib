@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.22] - 2022-05-11
+  
+### Fixed
+- Changed properties in siridb config comparing
+  
+## [0.2.21] - 2022-05-11
+  
+### Fixed
+- Changed properties in siridb config comparing
+
 ## [0.2.20] - 2022-05-11
   
 ### Fixed

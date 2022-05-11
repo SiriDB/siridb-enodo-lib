@@ -10,9 +10,9 @@ def config_equals(a, b):
         return False
     if a.get('password') != b.get('password'):
         return False
-    if a.get('dbname') != b.get('dbname'):
+    if a.get('database') != b.get('database'):
         return False
-    if a.get('hostlist')[0] != b.get('hostlist')[0]:
+    if a.get('host') != b.get('host'):
         return False
 
     return True
