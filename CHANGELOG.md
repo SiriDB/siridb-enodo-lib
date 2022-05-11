@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.19] - 2022-05-11
+
+### Fixed
+- Fetching enodo_id from file bugfix
+- Comparing config sections, env support
+
 ## [0.2.17] - 2022-05-09
 
 ### Fixed

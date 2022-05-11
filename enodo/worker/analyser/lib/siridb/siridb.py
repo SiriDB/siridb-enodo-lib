@@ -4,6 +4,17 @@ from siridb.connector import SiriDBClient
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
+def config_equals(a, b):
+    if a.get('username') != b.get('username'):
+        return False
+    if a.get('password') != b.get('password'):
+        return False
+    if a.get('dbname') != b.get('dbname'):
+        return False
+    if a.get('hostlist')[0] != b.get('hostlist')[0]:
+        return False
+
+    return True
 
 class SiriDB:
     siri = None
