@@ -23,7 +23,9 @@ from enodo.version import __version__ as VERSION
 
 class Worker:
 
-    def __init__(self, config_path, log_level):
+    def __init__(
+            self, config_path, log_level, worker_name="Worker",
+            worker_version="x.x.x"):
         self._loop = None
         self._log_level = log_level
         self._config = EnodoConfigParser()
@@ -46,6 +48,8 @@ class Worker:
         self._module_classes = {}
 
         prepare_logger(self._log_level)
+        logging.info(f"Starting {worker_name} V{worker_version}, "
+                     f"with lib V{VERSION}")
 
     async def _update_busy(self, busy, job_id=None):
         self._busy = busy
