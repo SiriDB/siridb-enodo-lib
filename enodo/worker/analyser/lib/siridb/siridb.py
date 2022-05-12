@@ -49,13 +49,11 @@ class SiriDB:
         return count
 
     # @classmethod
-    async def query_series_data(self, series_name, selector="*",
-                                since=None):
+    async def query_series_data(self, series_name, max_n_points,
+                                selector="*"):
 
-        query = f'select {selector} from "{series_name}"'
-        if since is not None:
-            query = (f'select {selector} from "{series_name}" '
-                     f'after now - {since}m')
+        query = (f'select {selector} from "{series_name}" '
+                 f'tail {max_n_points}')
         await self.siri.connect()
         result = None
         try:

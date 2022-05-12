@@ -44,33 +44,21 @@ class Analyser:
 
     async def execute_job(self, job_data):
         series_name = job_data.get("series_name")
-        series_state = job_data.get("series_state")
         job_config = SeriesJobConfigModel(**job_data.get('job_config'))
-        max_n_points = job_config.get('max_n_points')
-        time_unit = job_data.get("time_unit")
+        max_n_points = job_config.get('max_n_points', 1000000)
+        if max_n_points is None or max_n_points == "":
+            max_n_points = 1000000
         job_type = job_config.job_type
-        timeval = None
-
-        time_unit = (await self._siridb_data_client.run_query(
-            "show time_precision"))["data"][0]["value"]
 
         series_data = await self._siridb_data_client.query_series_data(
-            series_name, since=timeval)
-
-        # if max_n_points is not None and \
-        #         series_state.get("interval") is not None and \
-        #         time_unit is not None:
-        #     timeval = max_n_points * int(series_state.get("interval"))
-        #     if time_unit == "ms":
-        #         timeval = int(timeval / 1000)
-        #     timeval = int(timeval / 60)  # In minutes
+            series_name, max_n_points)
 
         if series_name not in series_data:
             return self._analyser_queue.put(
                 {'name': series_name,
                  'error': 'Cannot find series data'})
         # TODO: use tail function
-        dataset = series_data[series_name][-1000:]
+        dataset = series_data[series_name]
         parameters = job_config.module_params
 
         module_class = self._modules.get(job_config.module)
