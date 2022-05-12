@@ -58,7 +58,7 @@ class Analyser:
                 {'name': series_name,
                  'error': 'Cannot find series data'})
         # TODO: use tail function
-        dataset = series_data[series_name][-1000:]
+        dataset = series_data[series_name]
         parameters = job_config.module_params
 
         module_class = self._modules.get(job_config.module)
