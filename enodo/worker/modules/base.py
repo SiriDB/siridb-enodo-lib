@@ -53,5 +53,5 @@ def remove_outlier_in_df(df_in, col_name):
     fence_low = q1 - 1.5 * iqr
     fence_high = q3 + 1.5 * iqr
     df_out = df_in.loc[
-        (df_in[col_name] > fence_low) & (df_in[col_name] < fence_high)]
+        (df_in[col_name] >= fence_low) & (df_in[col_name] <= fence_high)]
     return df_out
