@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+### Added
+- Added logging with worker version and lib version on startup of worker
+
 ## [0.2.22] - 2022-05-11
   
 ### Fixed
