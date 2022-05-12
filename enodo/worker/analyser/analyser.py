@@ -46,6 +46,8 @@ class Analyser:
         series_name = job_data.get("series_name")
         job_config = SeriesJobConfigModel(**job_data.get('job_config'))
         max_n_points = job_config.get('max_n_points', 1000000)
+        if max_n_points is None or max_n_points == "":
+            max_n_points = 1000000
         job_type = job_config.job_type
 
         series_data = await self._siridb_data_client.query_series_data(
