@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - Implemented tail function of siridb for limiting datapoints fetched
 
+### Changed
+- Base model remove outliers from dataframe. Support flat lines
+
 ## [0.2.23] - 2022-05-12
 
 ### Added
