@@ -45,7 +45,8 @@ class SeriesJobConfigModel(dict):
                 "Invalid series job config, "
                 "module_params property must be a dict")
 
-        if max_n_points is not None and not isinstance(max_n_points, int):
+        if max_n_points is not None and not isinstance(
+                max_n_points, int):
             raise Exception(
                 "Invalid series job config, "
                 "max_n_points property must be an integer")
@@ -57,6 +58,10 @@ class SeriesJobConfigModel(dict):
 
         if config_name is None:
             config_name = str(uuid.uuid4())
+        elif " " in config_name:
+            raise Exception(
+                "Invalid series job config, "
+                "config_name must not contains any spaces")
 
         super(SeriesJobConfigModel, self).__init__({
             "activated": activated,

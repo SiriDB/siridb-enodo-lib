@@ -32,9 +32,11 @@ class EnodoModule(dict):
         :param name:
         :param module_arguments:  EnodoModuleArgument
         """
+        arguments_list = [EnodoModuleArgument(
+            **ma) for ma in module_arguments]
         super(EnodoModule, self).__init__({
             "name": name,
-            "module_arguments": module_arguments,
+            "module_arguments": arguments_list,
             "supported_jobs": supported_jobs,
             "job_load_weight": job_load_weight
         })
@@ -57,6 +59,13 @@ class EnodoModule(dict):
 
     def support_job_type(self, job_type):
         return job_type in self.supported_jobs
+
+    def conform_to_params(self, job_type, params):
+        for arg in self.get('module_arguments'):
+            if arg.required and job_type in arg.job_types \
+                    and arg.name not in params:
+                return False
+        return True
 
     def get_job_load_weight(self, job_type):
         return self.job_load_weight.get(job_type)

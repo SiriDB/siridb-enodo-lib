@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.25] - 2022-05-16
+
+### Added
+- Added check function to see if given dict of params is conform to EnodoModule specs
+- Check if a jobs config_name contains any spaces
+
 ## [0.2.24] - 2022-05-12
 
 ### Added
