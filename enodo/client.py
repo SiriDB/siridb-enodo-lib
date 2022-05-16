@@ -1,14 +1,11 @@
 import asyncio
 import datetime
-import errno
-import fcntl
 import os
 import uuid
 import logging
 
 import qpack
 
-from enodo.exceptions import EnodoConnectionError
 from .protocol.package import *
 from .version import __version__ as VERSION
 
@@ -42,6 +39,7 @@ class Client:
         self._sock = None
         self._running = True
         self._connected = False
+        self._read_task = None
 
     async def setup(self, cbs=None, handshake_cb=None):
         await self._connect()
@@ -73,9 +71,8 @@ class Client:
         while not self._connected and self._running:
             logging.info("Trying to connect")
             try:
-                self._sock = socket.socket(
-                    socket.AF_INET, socket.SOCK_STREAM)
-                self._sock.connect((self._hostname, self._port))
+                self._sock = await asyncio.open_connection(self._hostname,
+                                                           self._port)
             except Exception as e:
                 logging.warning(f"Cannot connect, {str(e)}")
                 logging.info("Retrying in 5")
@@ -83,73 +80,61 @@ class Client:
             else:
                 logging.info("Connected")
                 self._connected = True
-                fcntl.fcntl(self._sock, fcntl.F_SETFL, os.O_NONBLOCK)
 
     async def run(self):
+        self._read_task = asyncio.Task(self._read_from_socket())
         while self._running:
             diff = datetime.datetime.now() - self._last_heartbeat_send
             if diff.total_seconds() > int(
                     self._heartbeat_interval):
                 await self._send_heartbeat()
-
-            await self._read_from_socket()
             await asyncio.sleep(1)
 
     async def close(self):
         logging.info('Closing the socket')
         self._running = False
-        self._sock.close()
+        self._read_task.cancel()
+        self._sock[1].close()
 
     async def _read_from_socket(self):
-        try:
-            header = self._sock.recv(PACKET_HEADER_LEN)
-        except socket.error as e:
-            err = e.args[0]
-            if err == errno.EAGAIN or err == errno.EWOULDBLOCK:
-                pass
+        while self._running:
+            packet_type, packet_id, data = await read_packet(self._sock[0])
+
+            if len(data):
+                data = qpack.unpackb(data, decode='utf-8')
+
+            if packet_type == 0:
+                logging.warning("Connection lost, trying to reconnect")
+                self._connected = False
+                try:
+                    await self.setup(self._cbs)
+                except Exception as e:
+                    logging.error('Error while trying to setup client')
+                    logging.debug(f'Correspondig error: {str(e)}')
+                    await asyncio.sleep(5)
+            elif packet_type == HANDSHAKE_OK:
+                logging.info(f'Hands shaked with hub')
+            elif packet_type == HANDSHAKE_FAIL:
+                logging.warning(f'Hub does not want to shake hands')
+            elif packet_type == HEARTBEAT:
+                logging.debug(f'Heartbeat back from hub')
+            elif packet_type == RESPONSE_OK:
+                logging.debug(f'Hub received update correctly')
+            elif packet_type == UNKNOWN_CLIENT:
+                logging.error(f'Hub does not recognize us')
+                await self._handshake()
             else:
-                raise EnodoConnectionError
-        else:
-            await self._read_message(header)
-
-    async def _read_message(self, header):
-        packet_type, packet_id, data = await read_packet(self._sock, header)
-
-        if len(data):
-            data = qpack.unpackb(data, decode='utf-8')
-
-        if packet_type == 0:
-            logging.warning("Connection lost, trying to reconnect")
-            self._connected = False
-            try:
-                await self.setup(self._cbs)
-            except Exception as e:
-                logging.error('Error while trying to setup client')
-                logging.debug(f'Correspondig error: {str(e)}')
-                await asyncio.sleep(5)
-        elif packet_type == HANDSHAKE_OK:
-            logging.info(f'Hands shaked with hub')
-        elif packet_type == HANDSHAKE_FAIL:
-            logging.warning(f'Hub does not want to shake hands')
-        elif packet_type == HEARTBEAT:
-            logging.debug(f'Heartbeat back from hub')
-        elif packet_type == RESPONSE_OK:
-            logging.debug(f'Hub received update correctly')
-        elif packet_type == UNKNOWN_CLIENT:
-            logging.error(f'Hub does not recognize us')
-            await self._handshake()
-        else:
-            if packet_type in self._cbs.keys():
-                await self._cbs.get(packet_type)(data)
-            else:
-                logging.error(
-                    f'Message type not implemented: {packet_type}')
+                if packet_type in self._cbs.keys():
+                    await self._cbs.get(packet_type)(data)
+                else:
+                    logging.error(
+                        f'Message type not implemented: {packet_type}')
 
     async def _send_message(self, length, message_type, data):
         header = create_header(length, message_type)
 
         logging.debug(f"Sending type: {message_type}")
-        self._sock.send(header + data)
+        self._sock[1].write(header + data)
 
     async def send_message(self, body, message_type, use_qpack=True):
         if not self._connected:

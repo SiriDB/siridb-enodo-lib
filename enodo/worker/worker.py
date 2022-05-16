@@ -183,11 +183,9 @@ class Worker:
         await self._update_busy(False)
 
     async def _add_handshake_data(self):
-        serialized_modules = [self._modules[module]
-                              for module in self._modules]
-
+        serialized_module = list(self._modules.values())[0]
         return {'busy': self._busy,
-                'modules': serialized_modules}
+                'module': serialized_module}
 
     def load_module(self, base_dir):
         # Get installed module

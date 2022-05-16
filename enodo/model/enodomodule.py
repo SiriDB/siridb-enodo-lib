@@ -26,7 +26,7 @@ class EnodoModuleArgument(dict):
 
 class EnodoModule(dict):
     def __init__(
-            self, name, module_arguments, supported_jobs=[],
+            self, name, version, module_arguments, supported_jobs=[],
             job_load_weight={}):
         """
         :param name:
@@ -36,6 +36,7 @@ class EnodoModule(dict):
             **ma) for ma in module_arguments]
         super(EnodoModule, self).__init__({
             "name": name,
+            "version": version,
             "module_arguments": arguments_list,
             "supported_jobs": supported_jobs,
             "job_load_weight": job_load_weight
@@ -44,6 +45,10 @@ class EnodoModule(dict):
     @property
     def name(self):
         return self.get("name")
+
+    @property
+    def version(self):
+        return self.get("version")
 
     @property
     def module_arguments(self):

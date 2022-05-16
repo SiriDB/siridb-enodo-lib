@@ -1,3 +1,4 @@
+import asyncio
 import socket
 
 HANDSHAKE = 1
@@ -38,16 +39,20 @@ PACKET_HEADER_LEN = 6
 
 
 async def read_packet(sock, header_data=None):
-    if isinstance(sock, socket.socket):
-        if header_data is None:
-            header_data = sock.recv(PACKET_HEADER_LEN)
-        body_size, packet_type, packet_id = read_header(header_data)
-        return packet_type, packet_id, sock.recv(body_size)
-    else:
-        if header_data is None:
-            header_data = await sock.read(PACKET_HEADER_LEN)
-        body_size, packet_type, packet_id = read_header(header_data)
-        return packet_type, packet_id, await sock.read(body_size)
+    if header_data is None:
+        header_data = await read_full_data(sock, PACKET_HEADER_LEN)
+    body_size, packet_type, packet_id = read_header(header_data)
+    return packet_type, packet_id, await read_full_data(sock, body_size)
+
+
+async def read_full_data(sock, data_size):
+    r_data = bytearray()
+    while True:
+        chunk = await sock.read(data_size - len(r_data))
+        r_data += chunk
+        if len(r_data) == data_size:
+            break
+    return r_data
 
 
 def create_header(size, type, id=1):
