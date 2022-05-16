@@ -45,7 +45,8 @@ class SeriesJobConfigModel(dict):
                 "Invalid series job config, "
                 "module_params property must be a dict")
 
-        if max_n_points is not None and not isinstance(max_n_points, int):
+        if max_n_points is not None and not isinstance(
+                max_n_points, int):
             raise Exception(
                 "Invalid series job config, "
                 "max_n_points property must be an integer")
