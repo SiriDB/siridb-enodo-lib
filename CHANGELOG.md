@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Fixed socket data reading
 
+### Changed
+- Implemented module version specification in module property of job configs
+- Changed client to asyncio's open_connection
+
 ## [0.2.25] - 2022-05-16
 
 ### Added

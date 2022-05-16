@@ -21,6 +21,11 @@ class SeriesJobConfigModel(dict):
             raise Exception(
                 "Invalid series job config, module property must be a string")
 
+        if len(module.split("@")) != 2:
+            raise Exception(
+                "Invalid series job config, module property must have format "
+                "<module_name>@<module_version>")
+
         if job_type not in JOB_TYPES:
             raise Exception(
                 "Invalid series job config, unknown job_type")
@@ -81,7 +86,11 @@ class SeriesJobConfigModel(dict):
 
     @property
     def module(self):
-        return self.get("module")
+        return self.get("module").split("@")[0]
+
+    @property
+    def module_version(self):
+        return self.get("module").split("@")[1]
 
     @property
     def job_type(self):
