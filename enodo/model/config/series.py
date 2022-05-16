@@ -57,6 +57,10 @@ class SeriesJobConfigModel(dict):
 
         if config_name is None:
             config_name = str(uuid.uuid4())
+        elif " " in config_name:
+            raise Exception(
+                "Invalid series job config, "
+                "config_name must not contains any spaces")
 
         super(SeriesJobConfigModel, self).__init__({
             "activated": activated,
