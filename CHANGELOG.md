@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.27] - 2022-05-17
+
+### Fixed
+- Fixed socket connection managing
+
 ## [0.2.26] - 2022-05-16
 
 ### Fixed
