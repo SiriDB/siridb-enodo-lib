@@ -36,21 +36,18 @@ class Client:
         self._updates_on_heartbeat = []
         self._cbs = None
         self._handshake_data_cb = None
-        self._sock = None
+        self._reader = None
+        self._writer = None
         self._running = True
         self._connected = False
         self._read_task = None
 
     async def setup(self, cbs=None, handshake_cb=None):
-        await self._connect()
-
         self._cbs = cbs
         if cbs is None:
             self._cbs = {}
         if handshake_cb is not None:
             self._handshake_data_cb = handshake_cb
-
-        await self._handshake()
 
     def read_enodo_id(self, path):
         enodo_id = os.getenv(f"ENODO_ID")
@@ -68,37 +65,56 @@ class Client:
         return True
 
     async def _connect(self):
-        while not self._connected and self._running:
+        while not self._connected:
             logging.info("Trying to connect")
             try:
-                self._sock = await asyncio.open_connection(self._hostname,
-                                                           self._port)
+                self._reader, self._writer = await asyncio.open_connection(
+                    self._hostname,
+                    self._port)
             except Exception as e:
                 logging.warning(f"Cannot connect, {str(e)}")
                 logging.info("Retrying in 5")
-                await asyncio.sleep(5)
+                await asyncio.sleep(4)
             else:
                 logging.info("Connected")
                 self._connected = True
+                await self._handshake()
 
     async def run(self):
-        self._read_task = asyncio.Task(self._read_from_socket())
         while self._running:
-            diff = datetime.datetime.now() - self._last_heartbeat_send
-            if diff.total_seconds() > int(
-                    self._heartbeat_interval):
-                await self._send_heartbeat()
+            if self._writer is not None and (
+                    self._writer.transport.
+                    _conn_lost or self._writer.transport.is_closing()):
+                logging.info('Connection lost')
+                self._connected = False
+                self._writer.close()
+                self._writer = None
+                self._read_task.cancel()
+            if not self._connected:
+                await self._connect()
+            else:
+                diff = datetime.datetime.now() - self._last_heartbeat_send
+                if diff.total_seconds() > int(
+                        self._heartbeat_interval):
+                    await self._send_heartbeat()
             await asyncio.sleep(1)
 
     async def close(self):
         logging.info('Closing the socket')
         self._running = False
         self._read_task.cancel()
-        self._sock[1].close()
+        self._writer.close()
 
     async def _read_from_socket(self):
         while self._running:
-            packet_type, packet_id, data = await read_packet(self._sock[0])
+            if not self._connected:
+                await asyncio.sleep(1)
+                continue
+
+            packet_type, packet_id, data = await read_packet(self._reader)
+            if data is False:
+                self._connected = False
+                continue
 
             if len(data):
                 data = qpack.unpackb(data, decode='utf-8')
@@ -129,12 +145,17 @@ class Client:
                 else:
                     logging.error(
                         f'Message type not implemented: {packet_type}')
+            await asyncio.sleep(1)
 
     async def _send_message(self, length, message_type, data):
         header = create_header(length, message_type)
 
         logging.debug(f"Sending type: {message_type}")
-        self._sock[1].write(header + data)
+        self._writer.write(header + data)
+        try:
+            await self._writer.drain()
+        except Exception as e:
+            self._connected = False
 
     async def send_message(self, body, message_type, use_qpack=True):
         if not self._connected:
@@ -144,6 +165,7 @@ class Client:
         await self._send_message(len(body), message_type, body)
 
     async def _handshake(self):
+        self._read_task = asyncio.Task(self._read_from_socket())
         data = {
             'client_id': str(self._id),
             'client_type': self._client_type,

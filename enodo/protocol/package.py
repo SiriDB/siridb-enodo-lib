@@ -41,6 +41,8 @@ PACKET_HEADER_LEN = 6
 async def read_packet(sock, header_data=None):
     if header_data is None:
         header_data = await read_full_data(sock, PACKET_HEADER_LEN)
+    if header_data is False:
+        return None, None, False
     body_size, packet_type, packet_id = read_header(header_data)
     return packet_type, packet_id, await read_full_data(sock, body_size)
 
@@ -52,6 +54,9 @@ async def read_full_data(sock, data_size):
         r_data += chunk
         if len(r_data) == data_size:
             break
+        if len(r_data) == 0:
+            return False
+        await asyncio.sleep(0.01)
     return r_data
 
 
