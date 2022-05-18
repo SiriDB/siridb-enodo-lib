@@ -1,11 +1,13 @@
 class EnodoModuleArgument(dict):
 
-    def __init__(self, name, required, description, job_types):
+    def __init__(self, name, required, description, job_types,
+                 value_type=""):
         super(EnodoModuleArgument, self).__init__({
             "name": name,
             "required": required,
             "description": description,
-            "job_types": job_types})
+            "job_types": job_types,
+            "value_type": value_type})
 
     @property
     def name(self):
@@ -18,6 +20,10 @@ class EnodoModuleArgument(dict):
     @property
     def description(self):
         return self.get("description")
+
+    @property
+    def value_type(self):
+        return self.get("value_type")
 
     @property
     def job_types(self):

@@ -57,15 +57,15 @@ class Analyser:
             return self._analyser_queue.put(
                 {'name': series_name,
                  'error': 'Cannot find series data'})
-        # TODO: use tail function
+
         dataset = series_data[series_name]
         parameters = job_config.module_params
-
         module_class = self._modules.get(job_config.module)
 
         if module_class is not None:
             module = module_class(dataset, parameters,
-                                  series_name, self.query_siridb)
+                                  series_name, job_data,
+                                  self.query_siridb)
 
             if job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
                 await self._analyse_series(series_name, module)
