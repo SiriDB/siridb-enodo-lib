@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.28] - 2022-05-18
+
+### Added
+- Added functionality to receive siridb's `time_precision` value for both db's and make this available for the modules
+- Added optional `value_type` property for the `EnodoModuleArgument`
+
 ## [0.2.27] - 2022-05-17
 
 ### Fixed
