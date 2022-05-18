@@ -1,6 +1,7 @@
 class EnodoModuleArgument(dict):
 
-    def __init__(self, name, required, description, job_types, value_type=""):
+    def __init__(self, name, required, description, job_types,
+                 value_type=""):
         super(EnodoModuleArgument, self).__init__({
             "name": name,
             "required": required,
