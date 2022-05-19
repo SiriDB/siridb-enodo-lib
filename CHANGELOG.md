@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.29] - 2022-05-19
+
+### Changed
+- Implemented custom client asyncio protocol
+
+### Added
+- Implemented reconnect in client when haven't received heartbeat response from hub for a timespan of `2 * heartbeat_interval`
+- Seperate logger for client
+
 ## [0.2.28] - 2022-05-18
 
 ### Added

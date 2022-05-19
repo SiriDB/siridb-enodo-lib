@@ -18,3 +18,5 @@ def prepare_logger(log_level_label):
         style='%')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+
+    logging.getLogger('enodo.client').setLevel(log_level)
