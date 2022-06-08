@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.30] - 2022-06-08
+
+### Added
+- Check if any duplicate job config names are used in series config
+- Functionality to remove a job config
+- Functionality to add a job config
+
 ## [0.2.29] - 2022-05-19
 
 ### Changed

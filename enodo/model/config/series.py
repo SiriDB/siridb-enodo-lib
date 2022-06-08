@@ -148,6 +148,11 @@ class SeriesConfigModel(dict):
             jmc = SeriesJobConfigModel(**job)
             _job_config_list.append(jmc)
 
+        job_config_names = [job.config_name for job in _job_config_list]
+        if len(job_config_names) != len(list(set(job_config_names))):
+            raise Exception(
+                "Invalid series config, dupplicate job config name")
+
         if not isinstance(min_data_points, int):
             raise Exception(
                 "Invalid series config, "
@@ -190,6 +195,36 @@ class SeriesConfigModel(dict):
     def get_config_for_job(self, job_config_name):
         return self.job_config.get(job_config_name)
 
+    def add_config_for_job(self, job_config: dict):
+        jc = SeriesJobConfigModel(**job_config)
+        if self.job_config.get(jc.config_name) is not None:
+            raise Exception(
+                "Cannot add job config. There already exists a "
+                "job config with this name")
+
+        if jc.requires_job is not None and \
+                self.job_config.get(jc.requires_job) is None:
+            raise Exception(
+                "Cannot add job config. "
+                "The job requires a job which does not exist")
+
+        self['job_config'].append(jc)
+
+    def remove_config_for_job(self, job_config_name: str):
+        job_config_to_remove = self.job_config.get(job_config_name)
+        if job_config_to_remove is None:
+            return False
+        for job in self['job_config']:
+            if job.requires_job == job_config_to_remove.config_name:
+                raise Exception(
+                    "Cannot remove job config because another "
+                    "job requires the this job")
+        filtered_jcs = [
+            job for job in self['job_config']
+            if job.config_name != job_config_name]
+        self['job_config'] = filtered_jcs
+        return True
+
 
 class JobSchedule(dict):
 
@@ -214,6 +249,10 @@ class JobSchedule(dict):
 
         self[job_config_name] = value
 
+    def remove_job_schedule(self, job_config_name):
+        if job_config_name in self:
+            del self[job_config_name]
+
 
 class JobStatuses(dict):
 
@@ -233,6 +272,10 @@ class JobStatuses(dict):
     def set_job_status(self, job_config_name, value):
         self[job_config_name] = value
 
+    def remove_job_status(self, job_config_name):
+        if job_config_name in self:
+            del self[job_config_name]
+
 
 class JobCheckStatuses(dict):
 
@@ -251,6 +294,10 @@ class JobCheckStatuses(dict):
 
     def set_job_check_status(self, job_config_name, status_mesage):
         self[job_config_name] = status_mesage
+
+    def remove_job_check_status(self, job_config_name):
+        if job_config_name in self:
+            del self[job_config_name]
 
 
 class SeriesState(dict):
@@ -348,3 +395,9 @@ class SeriesState(dict):
         self['job_check_statuses'].set_job_check_status(
             job_config_name,
             status_message)
+
+    def remove_job_state(self, job_config_name):
+        self['job_statuses'].remove_job_status(job_config_name)
+        self['job_check_statuses'].remove_job_check_status(
+            job_config_name)
+        self['job_schedule'].remove_job_schedule(job_config_name)
