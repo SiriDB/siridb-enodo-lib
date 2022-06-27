@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.31] - 2022-06-27
+
+### Changed
+- Moved `characteristics` to series state
+
 ## [0.2.30] - 2022-06-08
 
 ### Added

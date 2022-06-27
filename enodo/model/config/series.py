@@ -306,6 +306,7 @@ class SeriesState(dict):
             self,
             datapoint_count=None,
             health=None,
+            characteristics=None,
             interval=None,
             job_schedule=None,
             job_check_statuses=None,
@@ -318,6 +319,7 @@ class SeriesState(dict):
         super(SeriesState, self).__init__({
             "datapoint_count": datapoint_count,
             "health": health,
+            "characteristics": characteristics,
             "interval": interval,
             "job_schedule": job_schedule,
             "job_statuses": job_statuses,
@@ -339,6 +341,14 @@ class SeriesState(dict):
     @health.setter
     def health(self, value):
         self["health"] = value
+
+    @property
+    def characteristics(self):
+        return self.get("characteristics")
+
+    @characteristics.setter
+    def characteristics(self, value):
+        self["characteristics"] = value
 
     @property
     def interval(self):
