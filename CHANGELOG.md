@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.32] - 2022-06-30
+
+### Changed
+- Add optional rid to series config for template reference
+
 ## [0.2.31] - 2022-06-27
 
 ### Changed
