@@ -128,7 +128,8 @@ class SeriesJobConfigModel(dict):
 class SeriesConfigModel(dict):
 
     def __init__(
-            self, job_config, min_data_points=None, realtime=False):
+            self, job_config, rid=None, min_data_points=None,
+            realtime=False):
         """
         Create new Series Config
         :param job_config: dict of job(key) and config(value)
@@ -162,10 +163,15 @@ class SeriesConfigModel(dict):
             raise Exception(
                 "Invalid series config, realtime property must be a bool")
 
-        super(SeriesConfigModel, self).__init__({
+        data = {
             "job_config": _job_config_list,
             "min_data_points": min_data_points,
-            "realtime": realtime})
+            "realtime": realtime
+        }
+        if rid is not None:
+            data['rid'] = rid
+
+        super(SeriesConfigModel, self).__init__(data)
 
     @property
     def job_config(self):
@@ -181,6 +187,11 @@ class SeriesConfigModel(dict):
     @property
     def realtime(self):
         return self.get("realtime")
+
+    @property
+    def rid(self):
+        # For reference to template
+        return self.get("rid")
 
     def get_config_for_job_type(self, job_type, first_only=True):
         r = []
