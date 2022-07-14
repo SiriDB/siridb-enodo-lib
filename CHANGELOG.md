@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.2.33] - 2022-07-14
+
+### Added
+- Added analyse_region to analysis results
+- Added job meta to series state
+
 ## [0.2.32] - 2022-06-30
 
 ### Changed

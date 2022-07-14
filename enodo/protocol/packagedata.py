@@ -113,7 +113,8 @@ class EnodoForecastJobResponseDataModel(EnodoJobDataModel):
     def required_fields(self):
         return [
             "successful",
-            "data"
+            "data",
+            "analyse_region"
         ]
 
 
@@ -127,7 +128,8 @@ class EnodoDetectAnomaliesJobResponseDataModel(EnodoJobDataModel):
     def required_fields(self):
         return [
             "successful",
-            "data"
+            "data",
+            "analyse_region"
         ]
 
 
@@ -156,7 +158,8 @@ class EnodoStaticRulesJobResponseDataModel(EnodoJobDataModel):
     def required_fields(self):
         return [
             "successful",
-            "data"
+            "data",
+            "analyse_region"
         ]
 
     def validate_data(self, data):

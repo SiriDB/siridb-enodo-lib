@@ -288,6 +288,29 @@ class JobStatuses(dict):
             del self[job_config_name]
 
 
+class JobAnalysisMeta(dict):
+
+    def __init__(self, metas=None):
+
+        if metas is None:
+            metas = {}
+        else:
+            if not isinstance(metas, dict):
+                raise Exception("Invalid series job metas")
+
+        super(JobAnalysisMeta, self).__init__(metas)
+
+    def get_job_meta(self, job_config_name):
+        return self.get(job_config_name)
+
+    def set_job_meta(self, job_config_name, value):
+        self[job_config_name] = value
+
+    def remove_job_meta(self, job_config_name):
+        if job_config_name in self:
+            del self[job_config_name]
+
+
 class JobCheckStatuses(dict):
 
     def __init__(self, statuses=None):
@@ -321,11 +344,13 @@ class SeriesState(dict):
             interval=None,
             job_schedule=None,
             job_check_statuses=None,
-            job_statuses=None):
+            job_statuses=None,
+            job_analysis_meta=None):
 
         job_schedule = JobSchedule(job_schedule)
         job_statuses = JobStatuses(job_statuses)
         job_check_statuses = JobCheckStatuses(job_check_statuses)
+        job_analysis_meta = JobAnalysisMeta(job_analysis_meta)
 
         super(SeriesState, self).__init__({
             "datapoint_count": datapoint_count,
@@ -334,7 +359,8 @@ class SeriesState(dict):
             "interval": interval,
             "job_schedule": job_schedule,
             "job_statuses": job_statuses,
-            "job_check_statuses": job_check_statuses
+            "job_check_statuses": job_check_statuses,
+            "job_analysis_meta": job_analysis_meta
         })
 
     @property
@@ -376,6 +402,10 @@ class SeriesState(dict):
     @job_schedule.setter
     def job_schedule(self, value):
         self["job_schedule"] = value
+
+    @property
+    def job_analysis_meta(self):
+        return self.get("job_analysis_meta")
 
     @property
     def job_statuses(self):
