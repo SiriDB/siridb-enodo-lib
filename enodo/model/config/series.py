@@ -287,6 +287,7 @@ class JobStatuses(dict):
         if job_config_name in self:
             del self[job_config_name]
 
+
 class JobAnalysisMeta(dict):
 
     def __init__(self, metas=None):
