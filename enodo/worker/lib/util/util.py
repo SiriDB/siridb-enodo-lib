@@ -1,6 +1,14 @@
 import functools
+import datetime
+import time
 from asyncio import events, ensure_future, futures
 from asyncio.tasks import _release_waiter, _cancel_and_wait
+
+
+def get_dt_to_midnight():
+    dt_obj = datetime.datetime.fromtimestamp(int(time.time()))
+    return (dt_obj.replace(hour=0, minute=0, second=0) +
+            datetime.timedelta(days=1)).timestamp()
 
 
 async def _waiter_check_cancel(cb):

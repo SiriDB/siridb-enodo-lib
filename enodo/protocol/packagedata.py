@@ -45,8 +45,9 @@ class EnodoJobDataModel():
         return json.dumps(self._children_to_dict())
 
     @classmethod
-    def unserialize(cls, json_data):
-        data = json.loads(json_data)
+    def unserialize(cls, data):
+        if isinstance(data, str):
+            data = json.loads(data)
         model_type = data.get("model_type")
 
         if model_type == "forecast_response":
@@ -91,12 +92,13 @@ class EnodoJobRequestDataModel(EnodoJobDataModel):
     @property
     def required_fields(self):
         return [
-            "job_id",
-            "series_name",
-            "job_config",
-            "series_config",
-            "series_state",
-            "siridb_ts_units"
+            "request_id",
+            "request_type"
+            # "series_name",
+            # "job_config",
+            # "series_config",
+            # "series_state",
+            # "siridb_ts_units"
         ]
 
     # TODO add optional fields for explicity

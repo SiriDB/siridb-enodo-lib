@@ -41,7 +41,7 @@ async def open_connection(host=None, port=None,
 
 class Client:
 
-    def __init__(self, loop, hostname, port, client_type, token,
+    def __init__(self, loop, hostname, port, client_type,
                  identity_file_path=None, heartbeat_interval=5,
                  client_version=VERSION):
         self.loop = loop
@@ -58,7 +58,6 @@ class Client:
             else:
                 self._id = enodo_id
 
-        self._token = token
         self._last_heartbeat_send = datetime.datetime.now()
         self._last_heartbeat_received = datetime.datetime.now()
         self._cbs = None
@@ -213,7 +212,6 @@ class Client:
         data = {
             'client_id': str(self._id),
             'client_type': self._client_type,
-            'token': self._token,
             'lib_version': self._client_version}
         if self._handshake_data_cb is not None:
             handshake_data = await self._handshake_data_cb()

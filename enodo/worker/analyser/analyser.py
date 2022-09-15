@@ -20,7 +20,7 @@ class Analyser:
     _current_future = None
 
     def __init__(
-            self, queue, siridb_data, siridb_output, modules):
+            self, queue, request, siridb_data, siridb_output, modules):
         self._siridb_data_client = self._siridb_output_client = SiriDB(
             siridb_data['user'],
             siridb_data['password'],
@@ -36,15 +36,16 @@ class Analyser:
                 siridb_output['port'])
         self._analyser_queue = queue
         self._modules = modules
+        self._request = request
 
     async def query_siridb(self, query, output=False):
         if output:
             return await self._siridb_output_client.run_query(query)
         return await self._siridb_data_client.run_query(query)
 
-    async def execute_job(self, job_data):
-        series_name = job_data.get("series_name")
-        job_config = SeriesJobConfigModel(**job_data.get('job_config'))
+    async def execute_job(self, request, state):
+        series_name = request.get("series_name")
+        job_config = SeriesJobConfigModel(**request.get('job_config'))
         max_n_points = job_config.get('max_n_points', 1000000)
         if max_n_points is None or max_n_points == "":
             max_n_points = 1000000
@@ -64,8 +65,8 @@ class Analyser:
 
         if module_class is not None:
             module = module_class(dataset, parameters,
-                                  series_name, job_data,
-                                  self.query_siridb)
+                                  series_name, request,
+                                  self.query_siridb, state)
 
             if job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
                 await self._analyse_series(series_name, module)
@@ -77,32 +78,42 @@ class Analyser:
                 await self._detect_anomalies(series_name, module)
             else:
                 self._analyser_queue.put(
-                    {'name': series_name,
+                    {'series_name': series_name,
                      'error': 'Job type not implemented'})
         else:
             self._analyser_queue.put(
-                {'name': series_name,
+                {'series_name': series_name,
                  'error': 'Module not implemented'})
 
     def _handle_response_to_queue(self, response_data):
         if not EnodoJobDataModel.validate_by_job_type(
                 response_data, response_data.get('job_type')):
             self._analyser_queue.put(
-                {'name': response_data.get('name'),
-                 'error': 'Job response not valid'})
+                {'result':
+                 {
+                     'series_name': response_data.get('name'),
+                     'error': 'Job response not valid'
+                 },
+                 'request': self._request
+                 })
             return
-        self._analyser_queue.put(response_data)
+        self._analyser_queue.put(
+            {
+                'result': response_data,
+                'request': self._request
+            }
+        )
 
     async def _analyse_series(self, series_name, analysis_module):
         response = await analysis_module.do_base_analysis()
         self._handle_response_to_queue(
-            {'name': series_name,
+            {'series_name': series_name,
              'job_type': JOB_TYPE_BASE_SERIES_ANALYSIS, **response})
 
     async def _check_static_rules(self, series_name, analysis_module):
         response = await analysis_module.do_static_rules_check()
         self._handle_response_to_queue({
-            'name': series_name,
+            'series_name': series_name,
             'job_type': JOB_TYPE_STATIC_RULES,
             **response})
 
@@ -160,11 +171,12 @@ class Analyser:
                      **response})
 
 
-async def _save_start_with_timeout(queue, job_data,
+async def _save_start_with_timeout(queue, job_data, state,
                                    siridb_data, siridb_output, modules):
     try:
-        analyser = Analyser(queue, siridb_data, siridb_output, modules)
-        await analyser.execute_job(job_data)
+        analyser = Analyser(queue, job_data, siridb_data,
+                            siridb_output, modules)
+        await analyser.execute_job(job_data, state)
     except Exception as e:
         tb = traceback.format_exc()
         error = f"{str(e)}, tb: {tb}"
@@ -174,12 +186,12 @@ async def _save_start_with_timeout(queue, job_data,
 
 
 def start_analysing(
-        queue, job_data, siridb_data, siridb_output, modules):
+        queue, job_data, state, siridb_data, siridb_output, modules):
     """Switch to new event loop and run forever"""
 
     try:
         asyncio.run(_save_start_with_timeout(
-            queue, job_data, siridb_data, siridb_output, modules))
+            queue, job_data, state, siridb_data, siridb_output, modules))
     except Exception as e:
         logging.error('Error while starting Analyzer')
         logging.debug(f'Corresponding error: {e}, '

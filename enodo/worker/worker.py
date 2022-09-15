@@ -1,191 +1,274 @@
 import asyncio
-import datetime
-import os
-import signal
 import logging
+from multiprocessing import Process, Queue as MQueue
+from queue import Queue
+import signal
+from time import time
+from enodo.model.config.worker import WorkerConfigModel
+from enodo.model.enodoevent import ENODO_EVENT_WORKER_ERROR, EnodoEvent
+from enodo.worker.analyser.analyser import start_analysing
+from enodo.version import __version__
+from enodo.worker.lib.config import EnodoConfigParser
+from enodo.worker.lib.util.util import get_dt_to_midnight
 
-from multiprocessing import Process, Queue
+import qpack
+from enodo.protocol.package import (
+    EVENT, WORKER_QUERY, WORKER_REQUEST, WORKER_REQUEST_RESULT, create_header,
+    read_packet, HEARTBEAT, HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT,
+    CLIENT_SHUTDOWN, HANDSHAKE_OK)
+from enodo.protocol.packagedata import EnodoJobRequestDataModel
 
-from enodo.client import Client
-from enodo.protocol.package import *
-from enodo.jobs import JOB_TYPE_FORECAST_SERIES, \
-    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_BASE_SERIES_ANALYSIS, \
-    JOB_TYPE_STATIC_RULES
-from enodo.protocol.packagedata import EnodoJobDataModel
-from enodo.model.config.series import SeriesJobConfigModel
-
-from .analyser import start_analysing
 from .modules import module_load
-from .lib.config import EnodoConfigParser
-from .lib.logging import prepare_logger
-from enodo.version import __version__ as VERSION
+
+AVAILABLE_LOG_LEVELS = {
+    'error': logging.ERROR, 'warning': logging.WARNING,
+    'info': logging.INFO, 'debug': logging.DEBUG}
 
 
-class Worker:
+def prepare_logger(log_level_label):
+    log_level = AVAILABLE_LOG_LEVELS.get(log_level_label)
+    logger = logging.getLogger()
+    logger.setLevel(log_level)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        fmt='[%(levelname)1.1s %(asctime)s hub] ' +
+            '%(message)s',
+        datefmt='%y%m%d %H:%M:%S',
+        style='%')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
-    def __init__(
-            self, config_path, log_level, worker_name="Worker",
-            worker_version="x.x.x"):
-        self._loop = None
-        self._log_level = log_level
+
+class HubClient:
+
+    def __init__(self, hub_id, writer, worker_config: dict):
+        self.hub_id = hub_id
+        self.writer = writer
+        self.worker_config = WorkerConfigModel(**worker_config)
+
+
+class SeriesState:
+
+    __slots__ = ['series_name', 'state', 'last_used']
+
+    def __init__(self, series_name, state, last_used=None):
+        self.series_name = series_name
+        self.state = state
+        self.last_used = last_used or time()
+
+    def update(self, state):
+        self.state = state
+        self.last_used = time()
+
+    @classmethod
+    def upsert(cls, obj, series_name, state):
+        if obj is not None:
+            return obj.update(state)
+        return cls(series_name, state)
+
+
+class WorkerServer:
+    def __init__(self, log_level, worker_name, worker_version):
+        prepare_logger(log_level)
         self._config = EnodoConfigParser()
-        if config_path is not None and os.path.exists(config_path):
-            self._config.read(config_path)
-        self._client = None
+        self._hostname = self._config.get('WORKER_HOSTNAME')
+        self._port = int(self._config.get('WORKER_PORT'))
+        self._server = None
+        self._server_coro = None
+        self._server_running = False
+        self._job_type = None
+        self._background_task = None
 
-        self._client_run_task = None
-        self._updater_task = None
-        self._result_queue = Queue()
+        self._clients = {}
+        self._settings = WorkerConfigModel({}, [])
+
+        self._open_jobs = Queue()
+        self._job_results = MQueue()
         self._busy = False
-        self._started_last_job = None
-        self._max_job_duration = self._config['worker'][
-            'max_job_duration']
-        self._worker_process = None
-        self._current_job = None
-        self._running = True
-        self._current_job_started_at = None
+        self._states = {}
+        self._state_lock = asyncio.Lock()
         self._modules = {}
         self._module_classes = {}
+        self._cleanup_task = None
 
-        prepare_logger(self._log_level)
         logging.info(f"Starting {worker_name} V{worker_version}, "
-                     f"with lib V{VERSION}")
+                     f"with lib V{__version__}")
 
-    async def _update_busy(self, busy, job_id=None):
-        self._busy = busy
-        self._current_job = job_id
-        self._current_job_started_at = \
-            datetime.datetime.now() if busy else None
-        await self._client.send_message(busy, WORKER_UPDATE_BUSY)
+    async def create(self, loop=None):
+        loop = loop or asyncio.get_running_loop()
+        self._server_running = True
+        self._server = await asyncio.start_server(
+            self._handle_client_connection, self._hostname, self._port,
+            loop=loop)
 
-    async def _send_refused(self):
-        await self._client.send_message(None, WORKER_REFUSED)
+    async def stop(self):
+        self._server_running = False
+        await self._server.close()
 
-    async def _send_shutdown(self):
-        await self._client.send_message(None, CLIENT_SHUTDOWN)
+    async def _cleanup(self):
+        while self._server_running:
+            print("sleeping until ", get_dt_to_midnight())
+            await asyncio.sleep(get_dt_to_midnight())
+            async with self._state_lock:
+                now = time()
+                for series_name in list(self._states.keys()):
+                    state = self._states[series_name]
+                    if state.last_used < now - 43200:
+                        # If not used in last 12 hours, cleanup
+                        del self._states[series_name]
 
-    async def _check_for_update(self):
-        while self._running:
-            if not self._result_queue.empty():
+    async def _handle_client_connection(self, reader, writer):
+        connected = True
+        saved_client_id = None
+        while connected and self._server_running:
+            packet_type, packet_id, data = await read_packet(reader)
+            if data is False:
+                connected = False
+                continue
+            if len(data):
+                data = qpack.unpackb(data, decode='utf-8')
+
+            addr = writer.get_extra_info('peername')
+            logging.debug("Received %r from %r" % (packet_id, addr))
+            if packet_id == 0:
+                logging.error('Received unknown packet id')
+                connected = False
+            elif packet_type == HANDSHAKE:
+                saved_client_id, connected = await self._handle_handshake(
+                    addr, writer, packet_id, data)
+            elif packet_type == HEARTBEAT:
+                await self._handle_heartbeat(addr, writer, packet_id, data)
+            elif packet_type == CLIENT_SHUTDOWN:
+                await self._handle_client_shutdown(saved_client_id)
+                connected = False
+            elif packet_type in [WORKER_REQUEST, WORKER_QUERY]:
                 try:
-                    result = self._result_queue.get()
+                    data['hub_id'] = saved_client_id
+                    request = EnodoJobRequestDataModel.unserialize(data)
                 except Exception as e:
-                    logging.error(
-                        'Error while fetching item from result queue')
-                    logging.debug(
-                        f'Corresponding error: {str(e)}, '
-                        f'exception class: {e.__class__.__name__}')
-                else:
-                    result['job_id'] = self._current_job
-                    await self._send_update(result)
-                    await self._update_busy(False)
-            if self._busy and (
-                datetime.datetime.now() - self._current_job_started_at)\
-                    .total_seconds() >= int(self._max_job_duration):
-                await self._cancel_job()
-            await asyncio.sleep(2)
-
-    async def _send_update(self, pkl):
-        try:
-            await self._client.send_message(pkl, WORKER_JOB_RESULT)
-        except Exception as e:
-            logging.error('Error while sending update to Hub')
-            logging.debug(f'Corresponding error: {str(e)}, '
-                          f'exception class: {e.__class__.__name__}')
-
-    async def _receive_job(self, data):
-        if self._busy:
-            await self._send_refused()
-        else:
-            try:
-                data = EnodoJobDataModel.unserialize(data)
-                logging.info(
-                    f'Received request for '
-                    f'{data.get("job_config").get("job_type")} for series: '
-                    f'"{data.get("series_name")}"')
-            except Exception as e:
-                logging.error(
-                    'Error while unserializing incoming job data')
-                logging.debug(
-                    f'Corresponding error: {str(e)}',
-                    f'exception class: {e.__class__.__name__}')
-            await self._update_busy(True, data.get('job_id'))
-            job_config = SeriesJobConfigModel(**data.get('job_config'))
-            job_type = job_config.job_type
-
-            if job_type in [JOB_TYPE_FORECAST_SERIES,
-                            JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
-                            JOB_TYPE_BASE_SERIES_ANALYSIS,
-                            JOB_TYPE_STATIC_RULES]:
-                module_name = job_config.module
-                if not await self._check_support_job_and_module(
-                        job_type, module_name):
-                    await self._send_update(
-                        {'error': 'Unsupported module for job_type',
-                         'job_id': data.get('job_id'),
-                         'name': data.get("series_name")})
-                    await self._update_busy(False)
-                    return
+                    logging.error("Could not deserialize request")
+                    continue
+                await self._handle_request(saved_client_id, request, writer)
             else:
-                await self._send_update(
-                    {'error': 'Unsupported job_type',
-                     'job_id': data.get('job_id'),
-                     'name': data.get("series_name")})
-                await self._update_busy(False)
-                return
+                logging.error(
+                    f'Package type {packet_type} not implemented')
 
-            try:
+        logging.info(f'Closing socket with client {saved_client_id}')
+        writer.close()
 
-                self._worker_process = Process(
-                    target=start_analysing,
-                    args=(
-                        self._result_queue, data,
-                        self._config['siridb_data'],
-                        self._config['siridb_output'],
-                        self._module_classes
-                    ))
-                # Start the thread
-                # self._worker_thread.daemon = True
-                self._worker_process.start()
-            except Exception as e:
-                logging.error('Error while creating worker thread')
-                logging.debug(
-                    f'Corresponding error: {str(e)}, '
-                    f'exception class: {e.__class__.__name__}')
+    async def _work_queues(self):
+        while self._server_running:
+            if not self._job_results.empty():
+                await self._work_result_queue()
+            if not self._open_jobs.empty():
+                next_job = self._open_jobs.get()
+                request = next_job.get('request')
+                async with self._state_lock:
+                    series_state = self._states.get(request.get('series_name'))
+                if series_state is not None:
+                    self._do_job(request, series_state.state)
+            await asyncio.sleep(0.1)
 
-    async def _check_support_job_and_module(self, job_type, module_name=None):
-        modules = self._modules.values()
-        if module_name is not None:
-            modules = [self._modules.get(module_name)]
-        for module in modules:
-            if module.support_job_type(job_type):
-                return True
-        return False
+    async def _work_result_queue(self):
+        result = self._job_results.get()
+        request = result['request']
+        async with self._state_lock:
+            SeriesState.upsert(
+                self._states[request.get('series_name')],
+                request.get('series_name'), result)
+        if 'error' in result:
+            event = EnodoEvent(
+                "Error occured in worker", result['error'],
+                ENODO_EVENT_WORKER_ERROR, request.get('series_name'))
+            response = create_header(len(data), EVENT, 1)
+            self._clients[request.get('hub_id')].writer.write(response + data)
+        if request.get('request_type') == "fetch":
+            data = {
+                "data": result['result'],
+                "request_id": request.get('request_id')
+            }
+            data = qpack.packb(data)
+            response = create_header(len(data), WORKER_REQUEST_RESULT, 1)
+            self._clients[request.get('hub_id')].writer.write(response + data)
+        await self._clients[request.get('hub_id')].writer.drain()
 
-    async def _cancel_job(self):
+    def _do_job(self, data, state):
         try:
-            self._worker_process.kill()
+            self._worker_process = Process(
+                target=start_analysing,
+                args=(self._job_results, data, state,
+                      {"host": self._config.get('SIRIDB_DATA_HOST'),
+                       "port": self._config.get('SIRIDB_DATA_PORT'),
+                       "user": self._config.get('SIRIDB_DATA_USER'),
+                       "password": self._config.get('SIRIDB_DATA_PASSWORD'),
+                       "database": self._config.get('SIRIDB_DATA_DATABASE')},
+                      {"host": self._config.get('SIRIDB_OUTPUT_HOST'),
+                       "port": self._config.get('SIRIDB_OUTPUT_PORT'),
+                       "user": self._config.get('SIRIDB_OUTPUT_USER'),
+                       "password": self._config.get('SIRIDB_OUTPUT_PASSWORD'),
+                       "database": self._config.get('SIRIDB_OUTPUT_DATABASE')},
+                      self._module_classes))
+            # Start the thread
+            self._worker_process.start()
         except Exception as e:
-            logging.error('Error while trying to cancel job')
-            logging.debug(f'Corresponding error: {str(e)}, '
-                          f'exception class: {e.__class__.__name__}')
-        finally:
-            await self._send_job_cancelled()
+            logging.error('Error while creating worker thread')
+            logging.debug(
+                f'Corresponding error: {str(e)}, '
+                f'exception class: {e.__class__.__name__}')
 
-    async def _receive_to_cancel_job(self, data):
-        job_id = data.get('job_id')
-        if job_id is self._current_job:
-            await self._cancel_job()
+    async def _handle_request(
+            self, hub_id, request: EnodoJobRequestDataModel, writer):
+        if request.get('request_type') in ["run", "fetch"]:
+            self._open_jobs.put({
+                "request": request,
+                "origin": hub_id
+            })
+        elif request.get('request_type') == "query":
+            async with self._state_lock:
+                series_state = self._states.get(request.get('series_name'))
+                if series_state is not None:
+                    series_state = series_state.state
+                data = {
+                    "data": series_state,
+                    "request_id": request.get('request_id')
+                }
+                data = qpack.packb(data)
+                response = create_header(len(data), WORKER_QUERY, 1)
+                writer.write(response + data)
+                await writer.drain()
 
-    async def _send_job_cancelled(self):
-        await self._client.send_message({
-            "job_id": self._current_job}, WORKER_JOB_CANCELLED)
-        await self._update_busy(False)
+    async def _handle_client_shutdown(self, client_id):
+        logging.info(f"Connection with hub {client_id} was closed")
+        del self._clients[client_id]
 
-    async def _add_handshake_data(self):
-        serialized_module = list(self._modules.values())[0]
-        return {'busy': self._busy,
-                'module': serialized_module}
+    async def _handle_heartbeat(self, addr, writer, packet_id, data):
+        if addr in self._clients:
+            response = create_header(0, HEARTBEAT, packet_id)
+        else:
+            response = create_header(0, UNKNOWN_CLIENT, packet_id)
+        writer.write(response)
+        await writer.drain()
+
+    async def _handle_handshake(self, addr, writer, packet_id, data):
+        client_data = data
+        worker_config = client_data.get('worker_config')
+
+        if worker_config['job_type'] != self._job_type:
+            logging.error("Hub connected with config "
+                          "which has invalid job types set")
+            response = create_header(0, HANDSHAKE_FAIL, packet_id)
+            writer.write(response)
+            await writer.drain()
+            return addr, False
+
+        self._clients[addr] = HubClient(addr, writer, worker_config)
+        self._settings = self._clients[addr].worker_config
+
+        response = create_header(0, HANDSHAKE_OK, packet_id)
+        writer.write(response)
+        await writer.drain()
+        return addr, True
 
     def load_module(self, base_dir):
         # Get installed module
@@ -194,7 +277,9 @@ class Worker:
         for module_name, module_class in modules.items():
             self._modules[module_name] = module_class.get_module_info()
             self._module_classes[module_name] = module_class
+            self._job_type = module_class.get_module_info().job_type
             logging.info(f" - {module_name}")
+            return  # TODO: Only once so just get first item instead of loop
 
     async def start_worker(self):
         if len(self._modules.keys()) < 1:
@@ -209,31 +294,24 @@ class Worker:
                 s, lambda s=s: asyncio.create_task(
                     self.shutdown(s)))
 
-        self._client = Client(
-            self._loop, self._config['worker']['hub_hostname'],
-            int(self._config['worker']['hub_port']),
-            'worker', self._config['worker']
-            ['internal_security_token'],
-            heartbeat_interval=int(
-                self._config['worker']['heartbeat_interval']),
-            identity_file_path=".enodo_id", client_version=VERSION)
+        await self.create()
+        self._background_task = self._loop.create_task(self._work_queues())
+        self._cleanup_task = self._loop.create_task(self._cleanup())
 
-        await self._client.setup(cbs={
-            WORKER_JOB: self._receive_job,
-            WORKER_JOB_CANCEL: self._receive_to_cancel_job
-        },
-            handshake_cb=self._add_handshake_data)
-        self._client_run_task = self._loop.create_task(
-            self._client.run())
-        self._updater_task = self._loop.create_task(
-            self._check_for_update())
+        await asyncio.gather(self._background_task)
+        await asyncio.gather(self._cleanup_task)
 
-        await asyncio.gather(self._client_run_task)
+    async def close(self):
+        logging.info('Closing the socket')
+        self._running = False
+        if self._background_task:
+            self._background_task.cancel()
 
     async def shutdown(self, s):
         self._running = False
-        await self._send_shutdown()
-        await self._client.close()
+        # TODO: Send shutdown msg
+        # await self._client.send_message(None, CLIENT_SHUTDOWN)
+        await self.close()
 
         """Cleanup tasks tied to the service's shutdown."""
         logging.info(f"Received exit signal {s.name}...")

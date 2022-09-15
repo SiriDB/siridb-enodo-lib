@@ -1,12 +1,10 @@
 class EnodoModuleArgument(dict):
 
-    def __init__(self, name, required, description, job_types,
-                 value_type=""):
+    def __init__(self, name, required, description, value_type=""):
         super(EnodoModuleArgument, self).__init__({
             "name": name,
             "required": required,
             "description": description,
-            "job_types": job_types,
             "value_type": value_type})
 
     @property
@@ -25,14 +23,10 @@ class EnodoModuleArgument(dict):
     def value_type(self):
         return self.get("value_type")
 
-    @property
-    def job_types(self):
-        return self.get("job_types")
-
 
 class EnodoModule(dict):
     def __init__(
-            self, name, version, module_arguments, supported_jobs=[],
+            self, name, version, module_arguments, job_type,
             job_load_weight={}):
         """
         :param name:
@@ -44,7 +38,7 @@ class EnodoModule(dict):
             "name": name,
             "version": version,
             "module_arguments": arguments_list,
-            "supported_jobs": supported_jobs,
+            "job_type": job_type,
             "job_load_weight": job_load_weight
         })
 
@@ -61,8 +55,8 @@ class EnodoModule(dict):
         return self.get("module_arguments")
 
     @property
-    def supported_jobs(self):
-        return self.get("supported_jobs")
+    def job_type(self):
+        return self.get("job_type")
 
     @property
     def job_load_weight(self):
