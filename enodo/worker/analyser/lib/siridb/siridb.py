@@ -1,4 +1,5 @@
-import logging
+from asyncio import ensure_future
+from enodo.worker.analyser.logger import logging
 
 from siridb.connector import SiriDBClient
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
@@ -54,13 +55,14 @@ class SiriDB:
 
         query = (f'select {selector} from "{series_name}" '
                  f'tail {max_n_points}')
-        await self.siri.connect()
-        result = None
         try:
+            await self.siri.connect()
+            result = None
             result = await self.siri.query(query)
         except (QueryError, InsertError, ServerError, PoolError,
                 AuthenticationError, UserAuthError) as e:
             logging.error('Connection problem with SiriDB server')
+            logging.debug(f'Corresponding error: {str(e)}')
         self.siri.close()
         return result
 

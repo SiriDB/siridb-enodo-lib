@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import traceback
 
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, \
@@ -9,6 +8,7 @@ from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import EnodoJobDataModel
 
 from .lib.siridb.siridb import SiriDB, config_equals
+from .logger import logging
 
 
 class Analyser:
@@ -54,10 +54,11 @@ class Analyser:
         series_data = await self._siridb_data_client.query_series_data(
             series_name, max_n_points)
 
-        if series_name not in series_data:
+        if series_data is None or series_name not in series_data:
             return self._analyser_queue.put(
                 {'name': series_name,
-                 'error': 'Cannot find series data'})
+                 'error': 'Cannot find series data',
+                 'request': self._request})
 
         dataset = series_data[series_name]
         parameters = job_config.module_params
@@ -79,11 +80,13 @@ class Analyser:
             else:
                 self._analyser_queue.put(
                     {'series_name': series_name,
-                     'error': 'Job type not implemented'})
+                     'error': 'Job type not implemented',
+                     'request': self._request})
         else:
             self._analyser_queue.put(
                 {'series_name': series_name,
-                 'error': 'Module not implemented'})
+                 'error': 'Module not implemented',
+                 'request': self._request})
 
     def _handle_response_to_queue(self, response_data):
         if not EnodoJobDataModel.validate_by_job_type(
@@ -124,7 +127,7 @@ class Analyser:
         :return:
         """
         error = None
-        response = []
+        response = {}
         try:
             response = await analysis_module.do_forecast()
         except Exception as e:
@@ -139,7 +142,8 @@ class Analyser:
                 self._analyser_queue.put(
                     {'name': series_name,
                      'job_type': JOB_TYPE_FORECAST_SERIES,
-                     'error': error})
+                     'error': error,
+                     'request': self._request})
             else:
                 self._handle_response_to_queue(
                     {'name': series_name,
@@ -163,7 +167,8 @@ class Analyser:
                 self._analyser_queue.put(
                     {'name': series_name,
                      'job_type': JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
-                     'error': error})
+                     'error': error,
+                     'request': self._request})
             else:
                 self._handle_response_to_queue(
                     {'name': series_name,
@@ -171,8 +176,8 @@ class Analyser:
                      **response})
 
 
-async def _save_start_with_timeout(queue, job_data, state,
-                                   siridb_data, siridb_output, modules):
+async def async_start_analysing(queue, job_data, state,
+                                siridb_data, siridb_output, modules):
     try:
         analyser = Analyser(queue, job_data, siridb_data,
                             siridb_output, modules)
@@ -186,14 +191,20 @@ async def _save_start_with_timeout(queue, job_data, state,
 
 
 def start_analysing(
-        queue, job_data, state, siridb_data, siridb_output, modules):
+        queue, log_queue, job_data, state, siridb_data, siridb_output, modules):
     """Switch to new event loop and run forever"""
 
+    logging._queue = log_queue
+    logging.info("HIIIIII")
     try:
-        asyncio.run(_save_start_with_timeout(
-            queue, job_data, state, siridb_data, siridb_output, modules))
+        asyncio.run(
+            async_start_analysing(
+                queue, job_data, state, siridb_data,
+                siridb_output, modules))
     except Exception as e:
-        logging.error('Error while starting Analyzer')
-        logging.debug(f'Corresponding error: {e}, '
+        tb = traceback.format_exc()
+        error = f"{str(e)}, tb: {tb}"
+        logging.error('Error while executing Analyzer')
+        logging.error(f'Corresponding error: {error}, '
                       f'exception class: {e.__class__.__name__}')
-        exit()
+    exit()

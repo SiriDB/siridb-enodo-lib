@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from multiprocessing import Process, Queue as MQueue
 from queue import Queue
@@ -48,32 +49,46 @@ class HubClient:
         self.worker_config = WorkerConfigModel(**worker_config)
 
 
-class SeriesState:
-
-    __slots__ = ['series_name', 'state', 'last_used']
+class SeriesState(dict):
 
     def __init__(self, series_name, state, last_used=None):
-        self.series_name = series_name
-        self.state = state
-        self.last_used = last_used or time()
+        super().__init__({
+            'series_name': series_name,
+            'state': state,
+            'last_used': last_used or time()
+        })
+
+    @property
+    def series_name(self):
+        return self['series_name']
+
+    @property
+    def state(self):
+        return self['state']
+
+    @property
+    def last_used(self):
+        return self['last_used']
 
     def update(self, state):
-        self.state = state
-        self.last_used = time()
+        self['state'] = state
+        self['last_used'] = time()
 
     @classmethod
     def upsert(cls, obj, series_name, state):
-        if obj is not None:
-            return obj.update(state)
-        return cls(series_name, state)
+        if series_name in obj:
+            return obj[series_name].update(state)
+        obj[series_name] = cls(series_name, state)
+        return obj[series_name]
 
 
 class WorkerServer:
-    def __init__(self, log_level, worker_name, worker_version):
+    def __init__(self, log_level, worker_name, worker_version, state_path):
         prepare_logger(log_level)
         self._config = EnodoConfigParser()
         self._hostname = self._config.get('WORKER_HOSTNAME')
         self._port = int(self._config.get('WORKER_PORT'))
+        self._state_path = state_path
         self._server = None
         self._server_coro = None
         self._server_running = False
@@ -85,12 +100,14 @@ class WorkerServer:
 
         self._open_jobs = Queue()
         self._job_results = MQueue()
+        self._logging_queue = MQueue()
         self._busy = False
         self._states = {}
         self._state_lock = asyncio.Lock()
         self._modules = {}
         self._module_classes = {}
         self._cleanup_task = None
+        self._worker_process = None
 
         logging.info(f"Starting {worker_name} V{worker_version}, "
                      f"with lib V{__version__}")
@@ -108,7 +125,6 @@ class WorkerServer:
 
     async def _cleanup(self):
         while self._server_running:
-            print("sleeping until ", get_dt_to_midnight())
             await asyncio.sleep(get_dt_to_midnight())
             async with self._state_lock:
                 now = time()
@@ -159,30 +175,43 @@ class WorkerServer:
 
     async def _work_queues(self):
         while self._server_running:
+            await asyncio.sleep(0.1)
             if not self._job_results.empty():
                 await self._work_result_queue()
             if not self._open_jobs.empty():
+                if isinstance(self._worker_process, Process) and \
+                        self._worker_process.is_alive():
+                    continue
                 next_job = self._open_jobs.get()
                 request = next_job.get('request')
                 async with self._state_lock:
                     series_state = self._states.get(request.get('series_name'))
                 if series_state is not None:
-                    self._do_job(request, series_state.state)
-            await asyncio.sleep(0.1)
+                    series_state = series_state.state
+                self._do_job(request, series_state)
+            if not self._logging_queue.empty():
+                log_entry = self._logging_queue.get()
+                log_method = getattr(logging, log_entry['level'])
+                try:
+                    log_method(log_entry['msg'])
+                except:
+                    logging.error("Could not log from queue")
 
     async def _work_result_queue(self):
         result = self._job_results.get()
+        print("HERE", result)
         request = result['request']
         async with self._state_lock:
             SeriesState.upsert(
-                self._states[request.get('series_name')],
-                request.get('series_name'), result)
+                self._states,
+                request.get('series_name'), result['result'])
         if 'error' in result:
             event = EnodoEvent(
                 "Error occured in worker", result['error'],
                 ENODO_EVENT_WORKER_ERROR, request.get('series_name'))
-            response = create_header(len(data), EVENT, 1)
-            self._clients[request.get('hub_id')].writer.write(response + data)
+            event = qpack.packb(event)
+            response = create_header(len(event), EVENT, 1)
+            self._clients[request.get('hub_id')].writer.write(response + event)
         if request.get('request_type') == "fetch":
             data = {
                 "data": result['result'],
@@ -197,14 +226,14 @@ class WorkerServer:
         try:
             self._worker_process = Process(
                 target=start_analysing,
-                args=(self._job_results, data, state,
+                args=(self._job_results, self._logging_queue, data, state,
                       {"host": self._config.get('SIRIDB_DATA_HOST'),
-                       "port": self._config.get('SIRIDB_DATA_PORT'),
+                       "port": int(self._config.get('SIRIDB_DATA_PORT')),
                        "user": self._config.get('SIRIDB_DATA_USER'),
                        "password": self._config.get('SIRIDB_DATA_PASSWORD'),
                        "database": self._config.get('SIRIDB_DATA_DATABASE')},
                       {"host": self._config.get('SIRIDB_OUTPUT_HOST'),
-                       "port": self._config.get('SIRIDB_OUTPUT_PORT'),
+                       "port": int(self._config.get('SIRIDB_OUTPUT_PORT')),
                        "user": self._config.get('SIRIDB_OUTPUT_USER'),
                        "password": self._config.get('SIRIDB_OUTPUT_PASSWORD'),
                        "database": self._config.get('SIRIDB_OUTPUT_DATABASE')},
@@ -228,11 +257,12 @@ class WorkerServer:
             async with self._state_lock:
                 series_state = self._states.get(request.get('series_name'))
                 if series_state is not None:
-                    series_state = series_state.state
+                    series_state = dict(series_state.state)
                 data = {
                     "data": series_state,
                     "request_id": request.get('request_id')
                 }
+                print(data)
                 data = qpack.packb(data)
                 response = create_header(len(data), WORKER_QUERY, 1)
                 writer.write(response + data)
@@ -294,6 +324,18 @@ class WorkerServer:
                 s, lambda s=s: asyncio.create_task(
                     self.shutdown(s)))
 
+        self._states = {}
+        try:
+            with open(self._state_path, 'r') as f:
+                data = f.read()
+                data = json.loads(data)
+        except Exception as e:
+            logging.error("Could not load state from disk on startup")
+            logging.debug(f"Corresponding error: {str(e)}")
+        else:
+            for series_name, state in data.items():
+                self._states[series_name] = SeriesState(series_name, state)
+
         await self.create()
         self._background_task = self._loop.create_task(self._work_queues())
         self._cleanup_task = self._loop.create_task(self._cleanup())
@@ -311,6 +353,17 @@ class WorkerServer:
         self._running = False
         # TODO: Send shutdown msg
         # await self._client.send_message(None, CLIENT_SHUTDOWN)
+        state = {}
+        for series_state in self._states.values():
+            state[series_state.series_name] = series_state.state
+
+        try:
+            with open(self._state_path, 'w') as f:
+                f.write(json.dumps(state))
+        except Exception as e:
+            logging.error("Could not save state to disk on shutdown")
+            logging.debug(f"Corresponding error: {str(e)}")
+
         await self.close()
 
         """Cleanup tasks tied to the service's shutdown."""
