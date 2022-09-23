@@ -3,8 +3,11 @@ import json
 import logging
 from multiprocessing import Process, Queue as MQueue
 from queue import Queue
+from random import randrange
 import signal
+from this import d
 from time import time
+from uuid import uuid4
 from enodo.model.config.worker import WorkerConfigModel
 from enodo.model.enodoevent import ENODO_EVENT_WORKER_ERROR, EnodoEvent
 from enodo.worker.analyser.analyser import start_analysing
@@ -16,7 +19,7 @@ import qpack
 from enodo.protocol.package import (
     EVENT, WORKER_QUERY, WORKER_REQUEST, WORKER_REQUEST_RESULT, create_header,
     read_packet, HEARTBEAT, HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT,
-    CLIENT_SHUTDOWN, HANDSHAKE_OK)
+    CLIENT_SHUTDOWN, HANDSHAKE_OK, WORKER_QUERY_RESULT)
 from enodo.protocol.packagedata import EnodoJobRequestDataModel
 
 from .modules import module_load
@@ -49,13 +52,26 @@ class HubClient:
         self.worker_config = WorkerConfigModel(**worker_config)
 
 
+class OpenWorkerRequest(dict):
+
+    def __init__(self):
+        self.id = str(uuid4()).replace("-", "")
+        self.opened_at = time()
+
+        super().__init__({
+            'id': self.id,
+            'opened_at': self.opened_at
+        })
+
+
 class SeriesState(dict):
 
     def __init__(self, series_name, state, last_used=None):
         super().__init__({
             'series_name': series_name,
             'state': state,
-            'last_used': last_used or time()
+            'last_used': last_used or time(),
+            'open_requests': {}
         })
 
     @property
@@ -69,6 +85,15 @@ class SeriesState(dict):
     @property
     def last_used(self):
         return self['last_used']
+
+    def get_request(self, request_id) -> OpenWorkerRequest:
+        return self['open_requests'].get(request_id)
+
+    def add_request(self, request: OpenWorkerRequest):
+        self['open_requests'][request.id] = request
+
+    def remove_request(self, request_id):
+        del self['open_requests'][request_id]
 
     def update(self, state):
         self['state'] = state
@@ -199,7 +224,10 @@ class WorkerServer:
 
     async def _work_result_queue(self):
         result = self._job_results.get()
-        print("HERE", result)
+        if 'request_job_result' in result:
+            await self.request_job_via_hub(result['job'])
+            return  # Module request job result from other module, no statechanges
+
         request = result['request']
         async with self._state_lock:
             SeriesState.upsert(
@@ -221,6 +249,19 @@ class WorkerServer:
             response = create_header(len(data), WORKER_REQUEST_RESULT, 1)
             self._clients[request.get('hub_id')].writer.write(response + data)
         await self._clients[request.get('hub_id')].writer.drain()
+
+    async def request_job_via_hub(self, job):
+        if len(self._clients) == 0:
+            return
+        if len(self._clients) == 1:
+            hub_client = self._clients.values()[0]
+        else:
+            hub_client = list(self._clients.values())[
+                randrange(0, len(self._clients) - 1)]
+        data = qpack.packb(job)
+        response = create_header(len(data), WORKER_REQUEST, 1)
+        hub_client.writer.write(response + job)
+        await hub_client.writer.drain()
 
     def _do_job(self, data, state):
         try:
@@ -264,7 +305,7 @@ class WorkerServer:
                 }
                 print(data)
                 data = qpack.packb(data)
-                response = create_header(len(data), WORKER_QUERY, 1)
+                response = create_header(len(data), WORKER_QUERY_RESULT, 1)
                 writer.write(response + data)
                 await writer.drain()
 
