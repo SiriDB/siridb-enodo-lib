@@ -1,6 +1,8 @@
 import json
 import logging
 from abc import abstractmethod
+from typing import Optional
+from uuid import uuid4
 
 
 class EnodoJobDataModel():
@@ -58,8 +60,6 @@ class EnodoJobDataModel():
             return EnodoBaseAnalysisJobResponseDataModel(**data)
         elif model_type == "static_rules_response":
             return EnodoStaticRulesJobResponseDataModel(**data)
-        elif model_type == "job_request":
-            return EnodoJobRequestDataModel(**data)
 
         return None
 
@@ -75,34 +75,99 @@ class EnodoJobDataModel():
                 return EnodoBaseAnalysisJobResponseDataModel(**data)
             elif job_type == "job_static_rules":
                 return EnodoStaticRulesJobResponseDataModel(**data)
-            elif job_type == "job_request":
-                return EnodoJobRequestDataModel(**data)
         except Exception as _:
             return False
 
         return True
 
 
-class EnodoJobRequestDataModel(EnodoJobDataModel):
+class EnodoRequestConfig(dict):
 
-    def __init__(self, **kwargs):
-        kwargs['model_type'] = "job_request"
-        super().__init__(**kwargs)
+    def __init__(self,
+                 config_name: str,
+                 job_type: str,
+                 max_n_points: Optional[int] = 100000,
+                 module_params: Optional[dict] = {}):
+        super().__init__({
+            'config_name': config_name,
+            'job_type': job_type,
+            'max_n_points': max_n_points,
+            'module_params': module_params
+        })
 
     @property
-    def required_fields(self):
-        return [
-            "request_id",
-            "request_type"
-            # "series_name",
-            # "job_config",
-            # "series_config",
-            # "series_state",
-            # "siridb_ts_units"
-        ]
+    def config_name(self) -> str:
+        return self['config_name']
 
-    # TODO add optional fields for explicity
-    # Optional: required_job_config
+    @property
+    def job_type(self) -> str:
+        return self['job_type']
+
+    @property
+    def max_n_points(self) -> int:
+        return self['max_n_points']
+
+    @property
+    def module_params(self) -> dict:
+        return self['module_params']
+
+
+class EnodoRequest(dict):
+
+    def __init__(self,
+                 series_name: str,
+                 request_type: str,
+                 config: Optional[EnodoRequestConfig] = None,
+                 hub_id: Optional[int] = None,
+                 pool_id: Optional[int] = None,
+                 worker_id: Optional[int] = None):
+        super().__init__({
+            'series_name': series_name,
+            'request_id': str(uuid4()).replace("-", ""),
+            'request_type': request_type,
+            'config': config,
+            'hub_id': hub_id,
+            'pool_id': pool_id,
+            'worker_id': worker_id
+        })
+
+    @property
+    def series_name(self) -> str:
+        return self['series_name']
+
+    @property
+    def request_id(self) -> str:
+        return self['request_id']
+
+    @property
+    def request_type(self) -> str:
+        return self['request_type']
+
+    @property
+    def config(self) -> EnodoRequestConfig:
+        return self['config']
+
+
+class EnodoRequestResponse(dict):
+
+    def __init__(self, series_name, request_id, response):
+        super().__init__({
+            'series_name': series_name,
+            'request_id': request_id,
+            'response': response
+        })
+
+    @property
+    def series_name(self):
+        return self['series_name']
+
+    @property
+    def request_id(self):
+        return self['request_id']
+
+    @property
+    def response(self):
+        return self['response']
 
 
 class EnodoForecastJobResponseDataModel(EnodoJobDataModel):

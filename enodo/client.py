@@ -151,7 +151,8 @@ class Client:
                 await asyncio.sleep(1)
                 continue
 
-            packet_type, packet_id, data = await read_packet(self._reader)
+            packet_type, pool_id, worker_id, data = await read_packet(
+                self._reader)
             if data is False:
                 self._connected = False
                 continue
