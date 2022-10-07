@@ -19,13 +19,11 @@ RESPONSE_OK = 14
 
 WORKER_REQUEST = 15
 WORKER_REQUEST_RESULT = 16
-# WORKER_REQU_CANCEL = 21
-# WORKER_JOB_CANCELLED = 22
-# WORKER_UPDATE_BUSY = 23
-# WORKER_REFUSED = 24
-EVENT = 17
-WORKER_QUERY = 18
-WORKER_QUERY_RESULT = 19
+WORKER_REQUEST_RESULT_REDIRECT = 17
+
+EVENT = 18
+WORKER_QUERY = 19
+WORKER_QUERY_RESULT = 20
 
 
 '''
@@ -44,9 +42,9 @@ async def read_packet(sock, header_data=None):
     if header_data is None:
         header_data = await read_full_data(sock, PACKET_HEADER_LEN)
     if header_data is False:
-        return None, None, False
+        return None, None, None, False
     body_size, packet_type = read_header(header_data)
-    if packet_type == WORKER_REQUEST_RESULT:
+    if packet_type == WORKER_REQUEST_RESULT_REDIRECT:
         header_data = await read_full_data(sock, 16)
         pool_id, worker_id = read_extended_header(header_data)
     return packet_type, pool_id, worker_id, await read_full_data(sock, body_size)

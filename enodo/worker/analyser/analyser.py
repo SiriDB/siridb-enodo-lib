@@ -1,9 +1,8 @@
 import asyncio
 import traceback
 
-from enodo.jobs import JOB_TYPE_FORECAST_SERIES, \
-    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, \
-    JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_STATIC_RULES
+from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
+                        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_NAMES)
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import EnodoJobDataModel
 
@@ -45,11 +44,11 @@ class Analyser:
 
     async def execute_job(self, request, state):
         series_name = request.get("series_name")
-        job_config = SeriesJobConfigModel(**request.get('job_config'))
+        job_config = SeriesJobConfigModel(**request.get('config'))
         max_n_points = job_config.get('max_n_points', 1000000)
         if max_n_points is None or max_n_points == "":
             max_n_points = 1000000
-        job_type = job_config.job_type
+        job_type = JOB_TYPE_NAMES[job_config.job_type_id]
 
         series_data = await self._siridb_data_client.query_series_data(
             series_name, max_n_points)
@@ -69,11 +68,7 @@ class Analyser:
                                   series_name, request,
                                   self.query_siridb, state)
 
-            if job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
-                await self._analyse_series(series_name, module)
-            elif job_type == JOB_TYPE_STATIC_RULES:
-                await self._check_static_rules(series_name, module)
-            elif job_type == JOB_TYPE_FORECAST_SERIES:
+            if job_type == JOB_TYPE_FORECAST_SERIES:
                 await self._forcast_series(series_name, module)
             elif job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES:
                 await self._detect_anomalies(series_name, module)
@@ -106,19 +101,6 @@ class Analyser:
                 'request': self._request
             }
         )
-
-    async def _analyse_series(self, series_name, analysis_module):
-        response = await analysis_module.do_base_analysis()
-        self._handle_response_to_queue(
-            {'series_name': series_name,
-             'job_type': JOB_TYPE_BASE_SERIES_ANALYSIS, **response})
-
-    async def _check_static_rules(self, series_name, analysis_module):
-        response = await analysis_module.do_static_rules_check()
-        self._handle_response_to_queue({
-            'series_name': series_name,
-            'job_type': JOB_TYPE_STATIC_RULES,
-            **response})
 
     async def _forcast_series(self, series_name, analysis_module):
         """
@@ -195,7 +177,6 @@ def start_analysing(
     """Switch to new event loop and run forever"""
 
     logging._queue = log_queue
-    logging.info("HIIIIII")
     try:
         asyncio.run(
             async_start_analysing(

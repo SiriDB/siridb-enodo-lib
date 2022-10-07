@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from multiprocessing import Process, Queue as MQueue, pool
+from multiprocessing import Process, Queue as MQueue
 from queue import Queue
 from random import randrange
 import signal
@@ -12,13 +12,14 @@ from enodo.worker.analyser.analyser import start_analysing
 from enodo.version import __version__
 from enodo.worker.lib.config import EnodoConfigParser
 from enodo.worker.lib.util.util import get_dt_to_midnight
+from enodo.jobs import JOB_TYPE_IDS
 
 import qpack
 from enodo.protocol.package import (
     EVENT, WORKER_QUERY, WORKER_REQUEST, WORKER_REQUEST_RESULT, create_header,
     read_packet, HEARTBEAT, HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT,
-    CLIENT_SHUTDOWN, HANDSHAKE_OK, WORKER_QUERY_RESULT)
-from enodo.protocol.packagedata import EnodoRequest
+    CLIENT_SHUTDOWN, HANDSHAKE_OK, WORKER_REQUEST_RESULT_REDIRECT)
+from enodo.protocol.packagedata import REQUEST_TYPE_WORKER, EnodoRequest, EnodoRequestResponse
 
 from .modules import module_load
 
@@ -94,7 +95,7 @@ class WorkerServer:
         self._server = None
         self._server_coro = None
         self._server_running = False
-        self._job_type = None
+        self._job_type_id = None
         self._background_task = None
 
         self._clients = {}
@@ -159,14 +160,16 @@ class WorkerServer:
                 await self._handle_client_shutdown(saved_client_id)
                 connected = False
             elif packet_type in [WORKER_REQUEST, WORKER_QUERY]:
-                if packet_type == WORKER_QUERY:
-                    data['hub_id'] = saved_client_id
+                data['hub_id'] = saved_client_id
+
                 try:
                     request = EnodoRequest(**data)
                 except Exception as e:
                     logging.error("Could not deserialize request")
                     continue
-                await self._handle_request(saved_client_id, request, writer)
+                self._open_jobs.put({
+                    "request": request
+                })
             elif packet_type == WORKER_REQUEST_RESULT:
                 await self._handle_request_result(data)
             else:
@@ -213,10 +216,8 @@ class WorkerServer:
     async def _work_result_queue(self):
         result = self._job_results.get()
         request = result['request']
-        if self._keep_state:
-            await self._upsert_state(
-                request.get('series_nane'), result['result'])
         if 'error' in result:
+            logging.error(f"Error occured in worker {result['error']}")
             event = EnodoEvent(
                 "Error occured in worker", result['error'],
                 ENODO_EVENT_WORKER_ERROR, request.get('series_name'))
@@ -224,40 +225,53 @@ class WorkerServer:
             response = create_header(len(event), EVENT)
             self._clients[request.get('hub_id')].writer.write(response + event)
             await self._clients[request.get('hub_id')].writer.drain()
-        if request.get('request_type') == "fetch":
-            data = {
-                "data": result['result'],
-                "request": request
-            }
-            await self.send_response_to_hub(
-                data, request['pool_id'], request['worker_id'])
 
-    async def send_response_to_hub(self, response, pool_id, worker_id):
+        if self._keep_state:
+            await self._upsert_state(
+                request.get('series_name'), result['result'])
+        if request.get('request_type') == REQUEST_TYPE_WORKER:
+            # TODO: custom header for quick worker_id lookup in hub
+            pass
+        else:
+            response = EnodoRequestResponse(
+                request.series_name,
+                request.request_id,
+                result,
+                request)
+            await self.send_response_to_hub(response, request)
+
+    async def send_response_to_hub(self, response, request):
+        pool_id = request['pool_id']
+        worker_id = request['worker_id']
         if len(self._clients) == 0:
             return
         if len(self._clients) == 1:
-            hub_client = self._clients.values()[0]
+            hub_client = list(self._clients.values())[0]
         else:
             hub_client = list(self._clients.values())[
                 randrange(0, len(self._clients) - 1)]
         data = qpack.packb(response)
-        header = create_header(len(data), WORKER_REQUEST_RESULT) + \
-            pool_id.to_bytes(4, byteorder='big') + \
-            worker_id.to_bytes(1, byteorder='big')
-        hub_client.writer.write(header + response)
+        if pool_id is not None and worker_id is not None:
+            header = create_header(
+                len(data), WORKER_REQUEST_RESULT_REDIRECT) + \
+                pool_id.to_bytes(4, byteorder='big') + \
+                worker_id.to_bytes(1, byteorder='big')
+        else:
+            header = create_header(len(data), WORKER_REQUEST_RESULT)
+        hub_client.writer.write(header + data)
         await hub_client.writer.drain()
 
     async def send_request_to_hub(self, request):
         if len(self._clients) == 0:
             return
         if len(self._clients) == 1:
-            hub_client = self._clients.values()[0]
+            hub_client = list(self._clients.values())[0]
         else:
             hub_client = list(self._clients.values())[
                 randrange(0, len(self._clients) - 1)]
         data = qpack.packb(request)
         header = create_header(len(data), WORKER_REQUEST)
-        hub_client.writer.write(header + request)
+        hub_client.writer.write(header + data)
         await hub_client.writer.drain()
 
     def _do_job(self, data, state):
@@ -284,27 +298,6 @@ class WorkerServer:
                 f'Corresponding error: {str(e)}, '
                 f'exception class: {e.__class__.__name__}')
 
-    async def _handle_request(
-            self, hub_id, request: EnodoRequest, writer):
-        if request.get('request_type') in ["run", "fetch"]:
-            self._open_jobs.put({
-                "request": request,
-                "origin": hub_id
-            })
-        elif request.get('request_type') == "query":
-            async with self._state_lock:
-                series_state = self._states.get(request.get('series_name'))
-                if series_state is not None:
-                    series_state = dict(series_state.state)
-                data = {
-                    "data": series_state,
-                    "request_id": request.get('request_id')
-                }
-                data = qpack.packb(data)
-                response = create_header(len(data), WORKER_QUERY_RESULT)
-                writer.write(response + data)
-                await writer.drain()
-
     async def _handle_client_shutdown(self, client_id):
         logging.info(f"Connection with hub {client_id} was closed")
         del self._clients[client_id]
@@ -321,7 +314,7 @@ class WorkerServer:
         client_data = data
         worker_config = client_data.get('worker_config')
 
-        if worker_config['job_type'] != self._job_type:
+        if worker_config['job_type_id'] != self._job_type_id:
             logging.error("Hub connected with config "
                           "which has invalid job types set")
             response = create_header(0, HANDSHAKE_FAIL)
@@ -344,7 +337,8 @@ class WorkerServer:
         for module_name, module_class in modules.items():
             self._modules[module_name] = module_class.get_module_info()
             self._module_classes[module_name] = module_class
-            self._job_type = module_class.get_module_info().job_type
+            self._job_type_id = JOB_TYPE_IDS[module_class.get_module_info(
+            ).job_type]
             logging.info(f" - {module_name}")
             return  # TODO: Only once so just get first item instead of loop
 

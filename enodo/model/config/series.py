@@ -1,15 +1,11 @@
 import uuid
 
-from enodo.jobs import (
-    JOB_TYPES,
-    JOB_STATUS_NONE,
-)
+from enodo.jobs import JOB_TYPE_IDS
 
 
 class SeriesJobConfigModel(dict):
 
-    def __init__(self, module, job_type, job_schedule_type,
-                 job_schedule, module_params, max_n_points=None,
+    def __init__(self, module, job_type_id, module_params, max_n_points=None,
                  activated=True, config_name=None, silenced=False,
                  requires_job=None):
 
@@ -26,24 +22,9 @@ class SeriesJobConfigModel(dict):
                 "Invalid series job config, module property must have format "
                 "<module_name>@<module_version>")
 
-        if job_type not in JOB_TYPES:
+        if job_type_id not in JOB_TYPE_IDS.values():
             raise Exception(
-                "Invalid series job config, unknown job_type")
-
-        if not isinstance(job_schedule_type, str):
-            raise Exception(
-                "Invalid series job config, "
-                "job_schedule_type property must be a string")
-
-        if job_schedule_type not in ['N', 'TS']:
-            raise Exception(
-                "Invalid series job config, "
-                "job_schedule_type property be one of: ['N', 'TS']")
-
-        if not isinstance(job_schedule, int):
-            raise Exception(
-                "Invalid series job config, "
-                "job_schedule property must be an integer")
+                "Invalid series job config, unknown job_type_id")
 
         if not isinstance(module_params, dict):
             raise Exception(
@@ -71,9 +52,7 @@ class SeriesJobConfigModel(dict):
         super(SeriesJobConfigModel, self).__init__({
             "activated": activated,
             "module": module,
-            "job_type": job_type,
-            "job_schedule_type": job_schedule_type,
-            "job_schedule": job_schedule,
+            "job_type_id": job_type_id,
             "max_n_points": max_n_points,
             "module_params": module_params,
             "config_name": config_name,
@@ -93,16 +72,8 @@ class SeriesJobConfigModel(dict):
         return self.get("module").split("@")[1]
 
     @property
-    def job_type(self):
-        return self.get("job_type")
-
-    @property
-    def job_schedule_type(self):
-        return self.get("job_schedule_type")
-
-    @property
-    def job_schedule(self):
-        return self.get("job_schedule")
+    def job_type_id(self):
+        return self.get("job_type_id")
 
     @property
     def max_n_points(self):
