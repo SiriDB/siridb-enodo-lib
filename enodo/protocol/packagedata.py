@@ -185,13 +185,17 @@ class EnodoRequestResponse(dict):
     def __init__(self,
                  series_name,
                  request_id,
-                 response,
-                 request):
+                 result,
+                 request,
+                 error=None):
+        if not isinstance(request, EnodoRequest):
+            request = EnodoRequest(**request)
         super().__init__({
             'series_name': series_name,
             'request_id': request_id,
-            'response': response,
-            'request': request
+            'result': result,
+            'request': request,
+            'error': error
         })
 
     @property
@@ -207,8 +211,12 @@ class EnodoRequestResponse(dict):
         return self['request']
 
     @property
-    def response(self):
-        return self['response']
+    def result(self):
+        return self['result']
+
+    @property
+    def error(self):
+        return self['error']
 
 
 class EnodoForecastJobResponseDataModel(EnodoJobDataModel):
