@@ -177,7 +177,7 @@ class EnodoRequest(dict):
 
     @property
     def meta(self) -> dict:
-        return self.meta
+        return self['meta']
 
 
 class EnodoRequestResponse(dict):
@@ -187,15 +187,20 @@ class EnodoRequestResponse(dict):
                  request_id,
                  result,
                  request,
-                 error=None):
+                 error=None,
+                 meta=None):
         if not isinstance(request, EnodoRequest):
             request = EnodoRequest(**request)
+
+        if meta is None:
+            meta = {}
         super().__init__({
             'series_name': series_name,
             'request_id': request_id,
             'result': result,
             'request': request,
-            'error': error
+            'error': error,
+            'meta': meta
         })
 
     @property
@@ -217,6 +222,10 @@ class EnodoRequestResponse(dict):
     @property
     def error(self):
         return self['error']
+
+    @property
+    def meta(self):
+        return self['meta']
 
 
 class EnodoForecastJobResponseDataModel(EnodoJobDataModel):

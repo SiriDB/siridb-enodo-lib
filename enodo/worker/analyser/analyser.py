@@ -4,7 +4,7 @@ import traceback
 from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
                         JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_NAMES)
 from enodo.model.config.series import SeriesJobConfigModel
-from enodo.protocol.packagedata import EnodoJobDataModel
+from enodo.protocol.packagedata import EnodoRequestResponse
 
 from .lib.siridb.siridb import SiriDB, config_equals
 from .logger import logging
@@ -55,9 +55,9 @@ class Analyser:
 
         if series_data is None or series_name not in series_data:
             return self._analyser_queue.put(
-                {'name': series_name,
-                 'error': 'Cannot find series data',
-                 'request': self._request})
+                EnodoRequestResponse(
+                    series_name, self._request.request_id, [],
+                    self._request, error="Cannot find series data"))
 
         dataset = series_data[series_name]
         parameters = job_config.module_params
@@ -74,33 +74,14 @@ class Analyser:
                 await self._detect_anomalies(series_name, module)
             else:
                 self._analyser_queue.put(
-                    {'series_name': series_name,
-                     'error': 'Job type not implemented',
-                     'request': self._request})
+                    EnodoRequestResponse(
+                        series_name, self._request.request_id, [],
+                        self._request, error="Jobtype not implemented"))
         else:
             self._analyser_queue.put(
-                {'series_name': series_name,
-                 'error': 'Module not implemented',
-                 'request': self._request})
-
-    def _handle_response_to_queue(self, response_data):
-        if not EnodoJobDataModel.validate_by_job_type(
-                response_data, response_data.get('job_type')):
-            self._analyser_queue.put(
-                {'result':
-                 {
-                     'series_name': response_data.get('name'),
-                     'error': 'Job response not valid'
-                 },
-                 'request': self._request
-                 })
-            return
-        self._analyser_queue.put(
-            {
-                'result': response_data,
-                'request': self._request
-            }
-        )
+                EnodoRequestResponse(
+                    series_name, self._request.request_id, [],
+                    self._request, error="Module not implemented"))
 
     async def _forcast_series(self, series_name, analysis_module):
         """
@@ -122,15 +103,16 @@ class Analyser:
         finally:
             if error is not None:
                 self._analyser_queue.put(
-                    {'name': series_name,
-                     'job_type': JOB_TYPE_FORECAST_SERIES,
-                     'error': error,
-                     'request': self._request})
+                    EnodoRequestResponse(
+                        series_name, self._request.request_id, [],
+                        self._request, error=error))
             else:
-                self._handle_response_to_queue(
-                    {'name': series_name,
-                     'job_type': JOB_TYPE_FORECAST_SERIES,
-                     **response})
+                self._analyser_queue.put(
+                    EnodoRequestResponse(
+                        series_name, self._request.request_id, response.get(
+                            'data', []),
+                        self._request, error=response.get('error'),
+                        meta=response.get('meta')))
 
     async def _detect_anomalies(self, series_name, analysis_module):
         error = None
@@ -147,15 +129,16 @@ class Analyser:
         finally:
             if error is not None:
                 self._analyser_queue.put(
-                    {'name': series_name,
-                     'job_type': JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
-                     'error': error,
-                     'request': self._request})
+                    EnodoRequestResponse(
+                        series_name, self._request.request_id, [],
+                        self._request, error=error))
             else:
-                self._handle_response_to_queue(
-                    {'name': series_name,
-                     'job_type': JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
-                     **response})
+                self._analyser_queue.put(
+                    EnodoRequestResponse(
+                        series_name, self._request.request_id, response.get(
+                            'data', []),
+                        self._request, error=response.get('error'),
+                        meta=response.get('meta')))
 
 
 async def async_start_analysing(queue, job_data, state,

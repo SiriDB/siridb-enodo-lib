@@ -179,31 +179,25 @@ class WorkerServer:
             SeriesState.upsert(self._states, series_name, result)
 
     async def _work_result_queue(self):
-        result = self._job_results.get()
-        request = result['request']
-        if 'error' in result:
-            print("NOOO")
-            logging.error(f"Error occured in worker {result['error']}")
+        response = self._job_results.get()
+        if not isinstance(response, EnodoRequestResponse):
+            logging.error("Got invalid result in queue")
+            return
+        if response.error:
+            logging.error(f"Error occured in worker {response.error}")
             event = EnodoEvent(
-                "Error occured in worker", result['error'],
-                ENODO_EVENT_WORKER_ERROR, request.get('series_name'))
+                "Error occured in worker", response.error,
+                ENODO_EVENT_WORKER_ERROR, response.series_name)
             event = qpack.packb(event)
-            response = create_header(len(event), EVENT)
-            self._clients[request.get('hub_id')].writer.write(response + event)
-            await self._clients[request.get('hub_id')].writer.drain()
+            header = create_header(len(event), EVENT)
+            hub_id =response.request.get('hub_id')
+            print(hub_id, self._clients)
+            if hub_id in self._clients:
+                self._clients[hub_id].writer.write(header + event)
+                await self._clients[hub_id].writer.drain()
         if self._keep_state:
-            await self._upsert_state(
-                request.get('series_name'), result['result'])
-        # if request.get('request_type') == PROTO_REQ_WORKER_REQUEST:
-        #     # TODO: custom header for quick worker_id lookup in hub
-        #     pass
-        # else:
-        response = EnodoRequestResponse(
-            request.series_name,
-            request.request_id,
-            result.get('result', {}),
-            request)
-        await self.send_response_to_hub(response, request)
+            await self._upsert_state(response.series_name, response.result)
+        await self.send_response_to_hub(response, response.request)
 
     async def send_response_to_hub(self, response, request):
         pool_id = request['pool_id']
