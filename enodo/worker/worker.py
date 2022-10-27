@@ -80,9 +80,9 @@ class SeriesState(dict):
 
 class WorkerServer:
     def __init__(
-            self, log_level, worker_name, worker_version, state_path):
-        prepare_logger(log_level)
+            self, worker_name, worker_version, state_path):
         self._config = EnodoConfigParser()
+        prepare_logger(self._config.get('WORKER_LOG_LEVEL'))
         self._hostname = self._config.get('WORKER_HOSTNAME')
         self._port = int(self._config.get('WORKER_PORT'))
         self._state_path = state_path
@@ -239,11 +239,6 @@ class WorkerServer:
                        "user": self._config.get('SIRIDB_DATA_USER'),
                        "password": self._config.get('SIRIDB_DATA_PASSWORD'),
                        "database": self._config.get('SIRIDB_DATA_DATABASE')},
-                      {"host": self._config.get('SIRIDB_OUTPUT_HOST'),
-                       "port": int(self._config.get('SIRIDB_OUTPUT_PORT')),
-                       "user": self._config.get('SIRIDB_OUTPUT_USER'),
-                       "password": self._config.get('SIRIDB_OUTPUT_PASSWORD'),
-                       "database": self._config.get('SIRIDB_OUTPUT_DATABASE')},
                       self._module_classes))
             # Start the thread
             self._worker_process.start()

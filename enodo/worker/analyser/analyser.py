@@ -14,32 +14,22 @@ class Analyser:
     _analyser_queue = None
     _busy = None
     _siridb_data_client = None
-    _siridb_output_client = None
     _shutdown = None
     _current_future = None
 
     def __init__(
-            self, queue, request, siridb_data, siridb_output, modules):
-        self._siridb_data_client = self._siridb_output_client = SiriDB(
+            self, queue, request, siridb_data, modules):
+        self._siridb_data_client = SiriDB(
             siridb_data['user'],
             siridb_data['password'],
             siridb_data['database'],
             siridb_data['host'],
             siridb_data['port'])
-        if not config_equals(siridb_data, siridb_output):
-            self._siridb_output_client = SiriDB(
-                siridb_output['user'],
-                siridb_output['password'],
-                siridb_output['database'],
-                siridb_output['host'],
-                siridb_output['port'])
         self._analyser_queue = queue
         self._modules = modules
         self._request = request
 
-    async def query_siridb(self, query, output=False):
-        if output:
-            return await self._siridb_output_client.run_query(query)
+    async def query_siridb(self, query):
         return await self._siridb_data_client.run_query(query)
 
     async def execute_job(self, request, state):
@@ -142,10 +132,9 @@ class Analyser:
 
 
 async def async_start_analysing(queue, job_data, state,
-                                siridb_data, siridb_output, modules):
+                                siridb_data, modules):
     try:
-        analyser = Analyser(queue, job_data, siridb_data,
-                            siridb_output, modules)
+        analyser = Analyser(queue, job_data, siridb_data, modules)
         await analyser.execute_job(job_data, state)
     except Exception as e:
         tb = traceback.format_exc()
@@ -156,15 +145,13 @@ async def async_start_analysing(queue, job_data, state,
 
 
 def start_analysing(
-        queue, log_queue, job_data, state, siridb_data, siridb_output, modules):
+        queue, log_queue, job_data, state, siridb_data, modules):
     """Switch to new event loop and run forever"""
 
     logging._queue = log_queue
     try:
-        asyncio.run(
-            async_start_analysing(
-                queue, job_data, state, siridb_data,
-                siridb_output, modules))
+        asyncio.run(async_start_analysing(
+            queue, job_data, state, siridb_data, modules))
     except Exception as e:
         tb = traceback.format_exc()
         error = f"{str(e)}, tb: {tb}"

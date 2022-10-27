@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.3.1] - 2022-10-27
+
+### Changed
+- Changed some arg vars to env vars thus using config
+
 ## [0.3.0] - 2022-10-27
 
 ### Changed

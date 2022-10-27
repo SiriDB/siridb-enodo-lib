@@ -14,13 +14,6 @@ EMPTY_CONFIG_FILE = {
         'user': '',
         'password': '',
         'database': '',
-    },
-    'siridb_output': {
-        'host': '',
-        'port': '',
-        'user': '',
-        'password': '',
-        'database': '',
     }
 }
 
