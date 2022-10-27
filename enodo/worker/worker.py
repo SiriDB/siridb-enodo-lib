@@ -16,14 +16,12 @@ from enodo.model.config.worker import WorkerConfigModel
 from enodo.worker.lib.util.util import get_dt_to_midnight
 from enodo.jobs import JOB_TYPE_IDS
 
-from .hub import ClientManager, HubClient
+from .hub import ClientManager
 
 import qpack
 from enodo.protocol.package import (
-    EVENT, WORKER_QUERY, WORKER_REQUEST, WORKER_REQUEST_RESULT, create_header,
-    read_packet, HEARTBEAT, HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT,
-    CLIENT_SHUTDOWN, HANDSHAKE_OK, WORKER_REQUEST_RESULT_REDIRECT)
-from enodo.protocol.packagedata import REQUEST_TYPE_WORKER, EnodoRequest, EnodoRequestResponse
+    EVENT, create_header)
+from enodo.protocol.packagedata import EnodoRequestResponse
 
 from .modules import module_load
 
@@ -190,8 +188,7 @@ class WorkerServer:
                 ENODO_EVENT_WORKER_ERROR, response.series_name)
             event = qpack.packb(event)
             header = create_header(len(event), EVENT)
-            hub_id =response.request.get('hub_id')
-            print(hub_id, self._clients)
+            hub_id = response.request.get('hub_id')
             if hub_id in self._clients:
                 self._clients[hub_id].writer.write(header + event)
                 await self._clients[hub_id].writer.drain()

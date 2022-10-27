@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.3.0] - 2022-10-27
+
+### Changed
+- Client class, implemented protocol
+- Updated dependencies
+
+### Added
+- Strict request and response classes
+
 ## [0.2.33] - 2022-07-14
 
 ### Added

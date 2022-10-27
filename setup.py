@@ -49,8 +49,7 @@ setup(
         'numpy',
         'pandas',
         'qpack',
-        'siridb-connector',
-        'statsmodels',
+        'siridb-connector'
     ],
     # What does your project relate to?
     keywords='data communication connector enodo siridb library',

@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from statsmodels.tsa.stattools import adfuller
 from enodo import EnodoModule
 
 
@@ -16,16 +15,6 @@ class BaseModule:
     @classmethod
     def get_module_info(cls) -> EnodoModule:
         raise NotImplementedError
-
-
-def adf_stationarity_test(timeseries):
-
-    # Dickey-Fuller test:
-    adf_test = adfuller(timeseries[1], autolag='AIC')
-
-    p_value = adf_test[1]
-
-    return p_value >= .05
 
 
 def find_frequency(datetime_list):
