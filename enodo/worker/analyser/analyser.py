@@ -6,7 +6,7 @@ from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import EnodoRequestResponse
 
-from .lib.siridb.siridb import SiriDB, config_equals
+from .lib.siridb.siridb import SiriDB
 from .logger import logging
 
 

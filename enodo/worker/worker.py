@@ -21,7 +21,7 @@ from .hub import ClientManager
 import qpack
 from enodo.protocol.package import (
     EVENT, create_header)
-from enodo.protocol.packagedata import EnodoRequestResponse
+from enodo.protocol.packagedata import QUERY_SUBJECT_STATE, QUERY_SUBJECT_STATS, EnodoQuery, EnodoRequestResponse
 
 from .modules import module_load
 
@@ -195,6 +195,20 @@ class WorkerServer:
         if self._keep_state:
             await self._upsert_state(response.series_name, response.result)
         await self.send_response_to_hub(response, response.request)
+
+    def get_query_result(self, query: EnodoQuery) -> EnodoQuery:
+        if query.subject == QUERY_SUBJECT_STATE:
+            query['result'] = self._states.get(query.series_name)
+        elif query.subject == QUERY_SUBJECT_STATS:
+            query['result'] = self._get_stats()
+        return query
+
+
+    def _get_stats(self):
+        return {
+            "jobs_in_queue": len(self._open_jobs),
+            "busy": self._busy
+        }
 
     async def send_response_to_hub(self, response, request):
         pool_id = request['pool_id']

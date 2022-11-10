@@ -127,6 +127,42 @@ REQUEST_TYPE_WORKER = 'worker'
 REQUEST_TYPE_HUB = 'hub'
 REQUEST_TYPE_EXTERNAL = 'external'
 
+QUERY_SUBJECT_STATE = 'query_state'
+QUERY_SUBJECT_STATS = 'query_stats'
+
+class EnodoQuery(dict):
+
+    def __init__(self,
+                query_id: str,
+                subject: str,
+                series_name: Optional[str] = None,
+                result: Optional[Any] = None):
+        if subject not in [QUERY_SUBJECT_STATE, QUERY_SUBJECT_STATS]:
+            raise Exception("Invalid subject for query")
+        super().__init__({
+            "id": query_id,
+            "subject": subject,
+            "series_name": series_name,
+            "result": result
+        })
+
+        @property
+        def query_id(self):
+            return self['id']
+
+        @property
+        def subject(self):
+            return self['subject']
+
+        @property
+        def series_name(self):
+            return self['series_name']
+
+        @property
+        def result(self):
+            return self['result']
+
+
 
 class EnodoRequest(dict):
 
