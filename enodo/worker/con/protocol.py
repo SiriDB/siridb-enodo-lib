@@ -51,10 +51,11 @@ class WorkerProtocol(BaseProtocol):
         logging.debug("Received worker query")
         try:
             query = EnodoQuery(**pkg.data)
-        except:
+        except Exception as e:
             logging.error("Received invalid query data")
+            logging.debug("Corresponding error: ", str(e))
         else:
-            result = await self._worker.get_query_result(query)
+            result = self._worker.get_query_result(query)
             resp_pkg = Package.make(
                 PROTO_RES_WORKER_QUERY, data=result)
             self.transport.write(resp_pkg.to_bytes())

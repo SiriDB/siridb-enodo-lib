@@ -140,27 +140,27 @@ class EnodoQuery(dict):
         if subject not in [QUERY_SUBJECT_STATE, QUERY_SUBJECT_STATS]:
             raise Exception("Invalid subject for query")
         super().__init__({
-            "id": query_id,
+            "query_id": query_id,
             "subject": subject,
             "series_name": series_name,
             "result": result
         })
 
-        @property
-        def query_id(self):
-            return self['id']
+    @property
+    def query_id(self):
+        return self['query_id']
 
-        @property
-        def subject(self):
-            return self['subject']
+    @property
+    def subject(self):
+        return self['subject']
 
-        @property
-        def series_name(self):
-            return self['series_name']
+    @property
+    def series_name(self):
+        return self['series_name']
 
-        @property
-        def result(self):
-            return self['result']
+    @property
+    def result(self):
+        return self['result']
 
 
 

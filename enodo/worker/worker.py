@@ -7,7 +7,7 @@ from random import randrange
 import signal
 from time import time
 from enodo.model.enodoevent import ENODO_EVENT_WORKER_ERROR, EnodoEvent
-from enodo.net import PROTO_REQ_WORKER_REQUEST, PROTO_RES_WORKER_REQUEST
+from enodo.net import (PROTO_REQ_WORKER_REQUEST, PROTO_RES_WORKER_REQUEST, PROTO_REQ_EVENT)
 from enodo.worker.analyser.analyser import start_analysing
 from enodo.version import __version__
 from enodo.worker.con import WorkerProtocol
@@ -19,8 +19,7 @@ from enodo.jobs import JOB_TYPE_IDS
 from .hub import ClientManager
 
 import qpack
-from enodo.protocol.package import (
-    EVENT, create_header)
+from enodo.protocol.package import create_header
 from enodo.protocol.packagedata import QUERY_SUBJECT_STATE, QUERY_SUBJECT_STATS, EnodoQuery, EnodoRequestResponse
 
 from .modules import module_load
@@ -187,7 +186,7 @@ class WorkerServer:
                 "Error occured in worker", response.error,
                 ENODO_EVENT_WORKER_ERROR, response.series_name)
             event = qpack.packb(event)
-            header = create_header(len(event), EVENT)
+            header = create_header(len(event), PROTO_REQ_EVENT)
             hub_id = response.request.get('hub_id')
             if hub_id in self._clients:
                 self._clients[hub_id].writer.write(header + event)
@@ -206,8 +205,9 @@ class WorkerServer:
 
     def _get_stats(self):
         return {
-            "jobs_in_queue": len(self._open_jobs),
-            "busy": self._busy
+            "jobs_in_queue": self._open_jobs.qsize(),
+            "busy": isinstance(self._worker_process, Process) and \
+                        self._worker_process.is_alive()
         }
 
     async def send_response_to_hub(self, response, request):
