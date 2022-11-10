@@ -111,16 +111,11 @@ class WorkerServer:
 
     async def create(self, loop: asyncio.AbstractEventLoop):
         self._server_running = True
-        # self._server = await asyncio.start_server(
-        #     self._handle_client_connection, self._hostname, self._port,
-        #     loop=loop)
-
         await loop.create_server(
             lambda: WorkerProtocol(worker=self), host=None, port=self._port)
 
     async def stop(self):
         self._server_running = False
-        # await self._server.close()
 
     async def _cleanup(self):
         while self._server_running:
@@ -205,6 +200,8 @@ class WorkerServer:
 
     def _get_stats(self):
         return {
+            "hostname": self._config.get('WORKER_HOSTNAME'),
+            "port": int(self._config.get('WORKER_PORT')),
             "jobs_in_queue": self._open_jobs.qsize(),
             "busy": isinstance(self._worker_process, Process) and \
                         self._worker_process.is_alive()
