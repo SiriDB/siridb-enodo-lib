@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.3.3] - 2022-11-14
+
+### Added
+- Worker queue management
+- Worker shutdown message
+
+### Changed
+- Removed some unused code
+
+### Fixed
+- Fixed field naming in EnodoEvent
+
 ## [0.3.1] - 2022-10-27
 
 ### Changed
