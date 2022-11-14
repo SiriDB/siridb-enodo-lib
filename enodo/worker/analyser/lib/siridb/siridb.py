@@ -1,4 +1,3 @@
-from asyncio import ensure_future
 from enodo.worker.analyser.logger import logging
 
 from siridb.connector import SiriDBClient

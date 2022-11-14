@@ -31,17 +31,17 @@ class EnodoEvent(dict):
     that occured. No state data is saved.
     """
 
-    def __init__(self, title, message, event_type, series=None):
+    def __init__(self, title, message, event_type, series=None, ts=None, uuid=None):
         if event_type not in ENODO_EVENT_TYPES:
             raise Exception()  # TODO Nice exception
 
         super().__init__({
             'title': title,
             'message': message,
-            'event_types': event_type,
+            'event_type': event_type,
             'series': series,
-            'ts': int(time()),
-            'uuid': str(uuid4()).replace("-", "")
+            'ts': ts or int(time()),
+            'uuid': uuid or str(uuid4()).replace("-", "")
         })
 
     @property
@@ -53,8 +53,8 @@ class EnodoEvent(dict):
         return self['message']
 
     @property
-    def event_types(self):
-        return self['event_types']
+    def event_type(self):
+        return self['event_type']
 
     @property
     def series(self):

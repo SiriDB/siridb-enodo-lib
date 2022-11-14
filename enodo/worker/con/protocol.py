@@ -2,8 +2,9 @@ import asyncio
 import logging
 from typing import Callable, Optional
 from enodo.net import (
-    PROTO_REQ_WORKER_QUERY, PROTO_REQ_WORKER_REQUEST, PROTO_RES_HANDSHAKE_FAIL, PROTO_RES_HANDSHAKE_OK, PROTO_RES_WORKER_QUERY, BaseProtocol, Package, PROTO_RES_HEARTBEAT,
-    PROTO_REQ_HANDSHAKE, PROTO_RES_WORKER_REQUEST)
+    PROTO_REQ_WORKER_QUERY, PROTO_REQ_WORKER_REQUEST, PROTO_RES_HANDSHAKE_FAIL,
+    PROTO_RES_HANDSHAKE_OK, PROTO_RES_WORKER_QUERY, BaseProtocol, Package,
+    PROTO_RES_HEARTBEAT, PROTO_REQ_HANDSHAKE, PROTO_RES_WORKER_REQUEST)
 from enodo.protocol.packagedata import EnodoQuery, EnodoRequest, EnodoRequestResponse
 from enodo.worker.hub import ClientManager, HubClient
 
@@ -46,8 +47,7 @@ class WorkerProtocol(BaseProtocol):
             PROTO_RES_HEARTBEAT, data=None)
         self.transport.write(resp_pkg.to_bytes())
 
-    async def _on_worker_query(self,
-                                 pkg: Package):
+    async def _on_worker_query(self, pkg: Package):
         logging.debug("Received worker query")
         try:
             query = EnodoQuery(**pkg.data)
@@ -61,20 +61,16 @@ class WorkerProtocol(BaseProtocol):
             self.transport.write(resp_pkg.to_bytes())
 
 
-    async def _on_worker_request(self,
-                                 pkg: Package):
+    async def _on_worker_request(self, pkg: Package):
         logging.debug("Received worker request")
         try:
             request = EnodoRequest(**pkg.data)
         except:
             logging.error("Received invalid request data")
         else:
-            self._worker._open_jobs.put({
-                "request": request
-            })
+            self._worker.add_request(request)
 
-    async def _on_worker_request_response(self,
-                                          pkg: Package):
+    async def _on_worker_request_response(self, pkg: Package):
         logging.debug("Response for requested job")
         try:
             response = EnodoRequestResponse(**pkg.data)

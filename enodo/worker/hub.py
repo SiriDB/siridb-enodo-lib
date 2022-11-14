@@ -1,3 +1,5 @@
+import logging
+from random import randrange
 from enodo.model.config.worker import WorkerConfigModel
 from enodo.net import Package
 
@@ -29,3 +31,11 @@ class ClientManager:
     @classmethod
     def get_client(cls, hub_id: str):
         return cls.clients.get(hub_id)
+
+    @classmethod
+    def get_random_client(cls) -> HubClient:
+        if len(cls.clients) == 0:
+            return None
+        if len(ClientManager.clients) == 1:
+            return list(cls.clients.values())[0]
+        return list(cls.clients.values())[randrange(0, len(cls.clients) - 1)]

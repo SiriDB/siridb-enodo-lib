@@ -29,9 +29,6 @@ class Analyser:
         self._modules = modules
         self._request = request
 
-    async def query_siridb(self, query):
-        return await self._siridb_data_client.run_query(query)
-
     async def execute_job(self, request, state):
         series_name = request.get("series_name")
         job_config = SeriesJobConfigModel(**request.get('config'))
@@ -55,8 +52,7 @@ class Analyser:
 
         if module_class is not None:
             module = module_class(dataset, parameters,
-                                  series_name, request,
-                                  self.query_siridb, state)
+                                  series_name, request, state)
 
             if job_type == JOB_TYPE_FORECAST_SERIES:
                 await self._forcast_series(series_name, module)

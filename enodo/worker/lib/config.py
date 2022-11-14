@@ -1,5 +1,5 @@
 import os
-from configparser import RawConfigParser, _UNSET, SectionProxy, ConfigParser
+from configparser import ConfigParser
 
 EMPTY_CONFIG_FILE = {
     'worker': {
@@ -32,14 +32,6 @@ def create_standard_config_file(path):
 
 
 class EnodoConfigParser:
-
-    # def __getitem__(self, key):
-    #     if key != self.default_section and not self.has_section(key):
-    #         return SectionProxy(self, key)
-    #     return self._proxies[key]
-
-    # def has_option(self, section, option):
-    #     return True
 
     def get(
             self, option):

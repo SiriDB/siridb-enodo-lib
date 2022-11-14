@@ -3,11 +3,14 @@ import json
 import logging
 from multiprocessing import Process, Queue as MQueue
 from queue import Queue
-from random import randrange
 import signal
 from time import time
-from enodo.model.enodoevent import ENODO_EVENT_WORKER_ERROR, EnodoEvent
-from enodo.net import (PROTO_REQ_WORKER_REQUEST, PROTO_RES_WORKER_REQUEST, PROTO_REQ_EVENT)
+
+from enodo.model.enodoevent import (
+    ENODO_EVENT_WORKER_ERROR, ENODO_EVENT_JOB_QUEUE_TOO_LONG, EnodoEvent)
+from enodo.net import (
+    PROTO_REQ_WORKER_REQUEST, PROTO_RES_WORKER_REQUEST, PROTO_REQ_EVENT,
+    PROTO_REQ_SHUTDOWN)
 from enodo.worker.analyser.analyser import start_analysing
 from enodo.version import __version__
 from enodo.worker.con import WorkerProtocol
@@ -15,14 +18,16 @@ from enodo.worker.lib.config import EnodoConfigParser
 from enodo.model.config.worker import WorkerConfigModel
 from enodo.worker.lib.util.util import get_dt_to_midnight
 from enodo.jobs import JOB_TYPE_IDS
+from enodo.protocol.packagedata import (
+    QUERY_SUBJECT_STATE, QUERY_SUBJECT_STATS, EnodoQuery, EnodoRequest,
+    EnodoRequestResponse)
 
 from .hub import ClientManager
-
-import qpack
-from enodo.protocol.package import create_header
-from enodo.protocol.packagedata import QUERY_SUBJECT_STATE, QUERY_SUBJECT_STATS, EnodoQuery, EnodoRequestResponse
-
 from .modules import module_load
+
+QUEUE_HEALTH_CHECK_INTERVAL = 1800  # Seconds
+MAX_QUEUE_LEN = 600  # Seconds
+MAX_PROCESS_DURATION = 60 # Seconds
 
 AVAILABLE_LOG_LEVELS = {
     'error': logging.ERROR, 'warning': logging.WARNING,
@@ -86,25 +91,23 @@ class WorkerServer:
         self._port = int(self._config.get('WORKER_PORT'))
         self._state_path = state_path
         self._server = None
-        self._server_coro = None
         self._server_running = False
         self._job_type_id = None
         self._background_task = None
-
-        self._clients = {}
         self._settings = WorkerConfigModel({}, [])
-
+        self._known_jobs = {}
         self._open_jobs = Queue()
         self._job_results = MQueue()
         self._logging_queue = MQueue()
-        self._busy = False
         self._states = {}
         self._state_lock = asyncio.Lock()
         self._modules = {}
         self._module_classes = {}
         self._cleanup_task = None
         self._worker_process = None
+        self._worker_process_started_at = None
         self._keep_state = False
+        self._queue_health_checked_at = None
 
         logging.info(f"Starting {worker_name} V{worker_version}, "
                      f"with lib V{__version__}")
@@ -139,14 +142,54 @@ class WorkerServer:
     async def handle_request_response(self, response: EnodoRequestResponse):
         pass
 
+    def add_request(self, request: EnodoRequest):
+        job_identifier = f"{request.series_name}_{request.config.config_name}"
+        if job_identifier in self._known_jobs:
+            logging.warning("New request is already queued")
+            return
+        self._open_jobs.put({
+            "request": request
+        })
+        self._known_jobs[job_identifier] = True
+
+    def _check_queue_health(self):
+        if self._queue_health_checked_at is not None and \
+            self._queue_health_checked_at > time() - \
+                QUEUE_HEALTH_CHECK_INTERVAL:
+            return
+        self._queue_health_checked_at = time()
+        queue_len = self._open_jobs.qsize()
+        if queue_len < MAX_QUEUE_LEN:
+            return
+        event = EnodoEvent(
+            "Queue size threshold",
+            f"Hit max queue size threshold {queue_len} > {MAX_QUEUE_LEN}",
+            ENODO_EVENT_JOB_QUEUE_TOO_LONG)
+        hub = ClientManager.get_random_client()
+        if hub:
+            hub.send(event, PROTO_REQ_EVENT)
+
+    def _check_process_health(self):
+        if self._worker_process_started_at is not None and \
+            self._worker_process_started_at > time() - \
+                MAX_PROCESS_DURATION:
+            return
+        self._worker_process_started_at = time()
+        try:
+            self._worker_process.terminate()
+        except:
+            pass
+
     async def _work_queues(self):
         while self._server_running:
             await asyncio.sleep(0.1)
             if not self._job_results.empty():
                 await self._work_result_queue()
             if not self._open_jobs.empty():
+                self._check_queue_health()
                 if isinstance(self._worker_process, Process) and \
                         self._worker_process.is_alive():
+                    self._check_process_health()
                     continue
                 next_request = self._open_jobs.get()
                 await self._handle_open_request(next_request)
@@ -160,6 +203,12 @@ class WorkerServer:
 
     async def _handle_open_request(self, next_request):
         request = next_request.get('request')
+        try:
+            job_identifier = (f"{request.series_name}_"
+                              f"{request.config.config_name}")
+            del self._known_jobs[job_identifier]
+        except:
+            pass
         async with self._state_lock:
             series_state = self._states.get(request.get('series_name'))
         if series_state is not None:
@@ -180,12 +229,10 @@ class WorkerServer:
             event = EnodoEvent(
                 "Error occured in worker", response.error,
                 ENODO_EVENT_WORKER_ERROR, response.series_name)
-            event = qpack.packb(event)
-            header = create_header(len(event), PROTO_REQ_EVENT)
             hub_id = response.request.get('hub_id')
-            if hub_id in self._clients:
-                self._clients[hub_id].writer.write(header + event)
-                await self._clients[hub_id].writer.drain()
+            if hub_id in ClientManager.clients:
+                ClientManager.clients[hub_id].send(event, PROTO_REQ_EVENT)
+                await ClientManager.clients[hub_id].writer.drain()
         if self._keep_state:
             await self._upsert_state(response.series_name, response.result)
         await self.send_response_to_hub(response, response.request)
@@ -197,46 +244,40 @@ class WorkerServer:
             query['result'] = self._get_stats()
         return query
 
-
     def _get_stats(self):
         return {
             "hostname": self._config.get('WORKER_HOSTNAME'),
             "port": int(self._config.get('WORKER_PORT')),
             "jobs_in_queue": self._open_jobs.qsize(),
-            "busy": isinstance(self._worker_process, Process) and \
-                        self._worker_process.is_alive()
+            "busy": isinstance(self._worker_process, Process) and
+            self._worker_process.is_alive()
         }
+
+    async def _announce_shutdown(self):
+        for hub_client in list(ClientManager.clients.values()):
+            try:
+                hub_client.send({}, PROTO_REQ_SHUTDOWN)
+                await hub_client.writer.drain()
+            except:
+                pass
 
     async def send_response_to_hub(self, response, request):
         pool_id = request['pool_id']
         worker_id = request['worker_id']
-        if len(ClientManager.clients) == 0:
+        hub_client = ClientManager.get_random_client()
+        if hub_client is None:
             logging.warning("No hub clients left to send response to")
             return
-        if len(ClientManager.clients) == 1:
-            hub_client = list(ClientManager.clients.values())[0]
-        else:
-            hub_client = list(ClientManager.clients.values())[
-                randrange(0, len(ClientManager.clients) - 1)]
         if pool_id is not None and worker_id is not None:
-            pass
-            # header = create_header(
-            #     len(data), WORKER_REQUEST_RESULT_REDIRECT) + \
-            #     pool_id.to_bytes(4, byteorder='big') + \
-            #     worker_id.to_bytes(1, byteorder='big')
+            pass  # used for future feature for res redirect to other worker
         else:
             hub_client.send(response, PROTO_RES_WORKER_REQUEST)
         logging.debug(f"Sending response to hub client {hub_client.hub_id}")
 
     async def send_request_to_hub(self, request):
-        if len(ClientManager.clients) == 0:
+        hub_client = ClientManager.get_random_client()
+        if hub_client is None:
             return
-        if len(ClientManager.clients) == 1:
-            hub_client = list(ClientManager.clients.values())[0]
-        else:
-            hub_client = list(ClientManager.clients.values())[
-                randrange(0, len(ClientManager.clients) - 1)]
-
         logging.debug(f"Sending request to hub client {hub_client.hub_id}")
         hub_client.send(request, PROTO_REQ_WORKER_REQUEST)
 
@@ -261,7 +302,7 @@ class WorkerServer:
 
     async def _handle_client_shutdown(self, client_id):
         logging.info(f"Connection with hub {client_id} was closed")
-        del self._clients[client_id]
+        del ClientManager[client_id]
 
     def load_module(self, base_dir):
         # Get installed module
@@ -306,10 +347,12 @@ class WorkerServer:
 
         await self.create(loop)
         self._background_task = loop.create_task(self._work_queues())
-        self._cleanup_task = self._loop.create_task(self._cleanup())
+        if self._keep_state:
+            self._cleanup_task = self._loop.create_task(self._cleanup())
 
         await asyncio.gather(self._background_task)
-        await asyncio.gather(self._cleanup_task)
+        if self._keep_state:
+            await asyncio.gather(self._cleanup_task)
 
     async def close(self):
         logging.info('Closing the socket')
@@ -320,7 +363,7 @@ class WorkerServer:
     async def shutdown(self, s):
         self._running = False
         # TODO: Send shutdown msg
-        # await self._client.send_message(None, CLIENT_SHUTDOWN)
+        await self._announce_shutdown()
         if self._keep_state:
             state = {}
             for series_state in self._states.values():

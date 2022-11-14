@@ -1,8 +1,6 @@
 
 class WorkerConfigModel(dict):
     def __init__(self, config: dict, job_type_id: list):
-        # if len(supported_job_types) < 1:
-        #     raise Exception("Invalid supported job types")
 
         super(WorkerConfigModel, self).__init__({
             "config": config,
