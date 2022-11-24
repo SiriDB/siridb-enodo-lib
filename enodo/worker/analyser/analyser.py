@@ -45,14 +45,28 @@ class Analyser:
                 EnodoRequestResponse(
                     series_name, self._request.request_id, [],
                     self._request, error="Cannot find series data"))
+        if len(series_data.get(series_name, [])) < 100:
+            return self._analyser_queue.put(
+                EnodoRequestResponse(
+                    series_name, self._request.request_id, [],
+                    self._request,
+                    error=("Series does not contain enough points, "
+                           "100 is the lowest amount of points allowed")))
 
         dataset = series_data[series_name]
         parameters = job_config.module_params
         module_class = self._modules.get(job_config.module)
 
         if module_class is not None:
-            module = module_class(dataset, parameters,
-                                  series_name, request, state)
+            try:
+                module = module_class(dataset, parameters,
+                                      series_name, request, state)
+            except Exception as e:
+                self._analyser_queue.put(
+                    EnodoRequestResponse(
+                        series_name, self._request.request_id, [],
+                        self._request, error=str(e)))
+                return
 
             if job_type == JOB_TYPE_FORECAST_SERIES:
                 await self._forcast_series(series_name, module)

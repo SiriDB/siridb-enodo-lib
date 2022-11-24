@@ -225,7 +225,7 @@ class WorkerServer:
             logging.error("Got invalid result in queue")
             return
         if response.error:
-            logging.error(f"Error occured in worker {response.error}")
+            logging.warning(f"Error occured in worker {response.error}")
             event = EnodoEvent(
                 "Error occured in worker", response.error,
                 ENODO_EVENT_WORKER_ERROR, response.series_name)

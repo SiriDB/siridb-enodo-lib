@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+### Added 
+- Lowest allowed point count check added before calling module class
+
 ## [0.3.3] - 2022-11-14
 
 ### Added
