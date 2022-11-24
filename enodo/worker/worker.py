@@ -10,7 +10,7 @@ from enodo.model.enodoevent import (
     ENODO_EVENT_WORKER_ERROR, ENODO_EVENT_JOB_QUEUE_TOO_LONG, EnodoEvent)
 from enodo.net import (
     PROTO_REQ_WORKER_REQUEST, PROTO_RES_WORKER_REQUEST, PROTO_REQ_EVENT,
-    PROTO_REQ_SHUTDOWN)
+    PROTO_REQ_SHUTDOWN, PROTO_RES_WORKER_REQUEST_REDIRECT)
 from enodo.worker.analyser.analyser import start_analysing
 from enodo.version import __version__
 from enodo.worker.con import WorkerProtocol
@@ -27,7 +27,7 @@ from .modules import module_load
 
 QUEUE_HEALTH_CHECK_INTERVAL = 1800  # Seconds
 MAX_QUEUE_LEN = 600  # Seconds
-MAX_PROCESS_DURATION = 60 # Seconds
+MAX_PROCESS_DURATION = 60  # Seconds
 
 AVAILABLE_LOG_LEVELS = {
     'error': logging.ERROR, 'warning': logging.WARNING,
@@ -269,7 +269,7 @@ class WorkerServer:
             logging.warning("No hub clients left to send response to")
             return
         if pool_id is not None and worker_id is not None:
-            pass  # used for future feature for res redirect to other worker
+            hub_client.send(response, PROTO_RES_WORKER_REQUEST_REDIRECT)
         else:
             hub_client.send(response, PROTO_RES_WORKER_REQUEST)
         logging.debug(f"Sending response to hub client {hub_client.hub_id}")
