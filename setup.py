@@ -12,7 +12,7 @@ try:
         long_description = f.read()
 except IOError:
     long_description = '''
-    The Endodo HUB connector can be used to communicate with the SiriDB Enodo HUB.
+The Enodo HUB connector can be used to communicate with the SiriDB Enodo HUB.
     '''.strip()
 
 setup(
@@ -23,7 +23,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/SiriDB/siridb-enodo-lib',
     author='Timo Janssen',
-    author_email='timo@transceptor.technology',
+    author_email='timo@cesbit.com',
     license='GPLv3',
     classifiers=[
         # How mature is this project? Common values are
@@ -44,7 +44,13 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
-
+    install_requires=[
+        'func_timeout',
+        'numpy',
+        'pandas',
+        'qpack',
+        'siridb-connector'
+    ],
     # What does your project relate to?
     keywords='data communication connector enodo siridb library',
 

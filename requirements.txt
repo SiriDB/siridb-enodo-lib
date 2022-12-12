@@ -1,1 +1,4 @@
-qpack==0.0.17
+qpack==0.0.21
+func_timeout==4.3.5
+pandas==1.5.1
+siridb-connector==2.0.8

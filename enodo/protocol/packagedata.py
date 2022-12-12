@@ -1,111 +1,187 @@
-import json
-import logging
-from abc import ABC, abstractmethod
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES
+from typing import Any, Optional
+from uuid import uuid4
 
-class EnodoJobDataModel():
+from enodo.model.config.series import SeriesJobConfigModel
 
-    def __init__(self, **kwargs):
-        self._dict_values = kwargs
-        if not self.validate():
-            raise Exception("invalid data for packaga data")
-        
-        # self.__dict__ = json.loads(self._raw_data)
 
-    def validate(self):
-        if self.required_fields is not None:
-            for key in self.required_fields:
-                if key not in self._dict_values.keys():
-                    logging.info(f"Missing '{key}' in enodo job data model data")
-                    return False
-        return "model_type" in self._dict_values.keys()
+class EnodoRequestConfig(dict):
+
+    def __init__(self,
+                 config_name: str,
+                 job_type_id: str,
+                 max_n_points: Optional[int] = 100000,
+                 module_params: Optional[dict] = {}):
+        super().__init__({
+            'config_name': config_name,
+            'job_type_id': job_type_id,
+            'max_n_points': max_n_points,
+            'module_params': module_params
+        })
 
     @property
-    @abstractmethod
-    def required_fields(self):
-        """ return the sound the animal makes """
+    def config_name(self) -> str:
+        return self['config_name']
 
-    def get(self, key):
-        return self._dict_values.get(key)
+    @property
+    def job_type_id(self) -> str:
+        return self['job_type_id']
 
-    def serialize(self):
-        return json.dumps(self._dict_values)
+    @property
+    def max_n_points(self) -> int:
+        return self['max_n_points']
+
+    @property
+    def module_params(self) -> dict:
+        return self['module_params']
 
     @classmethod
-    def unserialize(cls, json_data):
-        data = json.loads(json_data)
-        model_type = data.get("model_type")
-
-        if model_type == "forecast_response":
-            return EnodoForecastJobResponseDataModel(**data)
-        elif model_type == "anomaly_response":
-            return EnodoDetectAnomaliesJobResponseDataModel(**data)
-        elif model_type == "base_response":
-            return EnodoBaseAnalysisJobResponseDataModel(**data)
-        elif model_type == "forecast_response":
-            return EnodoForecastJobResponseDataModel(**data)
-        elif model_type == "job_request":
-            return EnodoJobRequestDataModel(**data)
-        
-
-        return None
+    def from_job_config(cls, config: SeriesJobConfigModel):
+        return cls(
+            config.config_name,
+            config.job_type_id,
+            config.max_n_points,
+            config.module_params
+        )
 
 
-class EnodoJobRequestDataModel(EnodoJobDataModel):
+REQUEST_TYPE_WORKER = 'worker'
+REQUEST_TYPE_HUB = 'hub'
+REQUEST_TYPE_EXTERNAL = 'external'
 
-    def __init__(self, **kwargs):
-        kwargs['model_type'] = "job_request"
-        super().__init__(**kwargs)
+QUERY_SUBJECT_STATE = 'query_state'
+QUERY_SUBJECT_STATS = 'query_stats'
 
-    @property
-    def required_fields(self):
-        return [
-            "job_id",
-            "job_type",
-            "series_name",
-            "series_config",
-            "global_series_config"
-        ]
+class EnodoQuery(dict):
 
-
-class EnodoForecastJobResponseDataModel(EnodoJobDataModel):
-
-    def __init__(self, **kwargs):
-        kwargs['model_type'] = "forecast_response"
-        super().__init__(**kwargs)
+    def __init__(self,
+                query_id: str,
+                subject: str,
+                series_name: Optional[str] = None,
+                result: Optional[Any] = None):
+        if subject not in [QUERY_SUBJECT_STATE, QUERY_SUBJECT_STATS]:
+            raise Exception("Invalid subject for query")
+        super().__init__({
+            "query_id": query_id,
+            "subject": subject,
+            "series_name": series_name,
+            "result": result
+        })
 
     @property
-    def required_fields(self):
-        return [
-            "successful",
-            "forecast_points"
-        ]
-
-class EnodoDetectAnomaliesJobResponseDataModel(EnodoJobDataModel):
-
-    def __init__(self, **kwargs):
-        kwargs['model_type'] = "anomaly_response"
-        super().__init__(**kwargs)
+    def query_id(self):
+        return self['query_id']
 
     @property
-    def required_fields(self):
-        return [
-            "successful",
-            "flagged_anomaly_points"
-        ]
-
-class EnodoBaseAnalysisJobResponseDataModel(EnodoJobDataModel):
-
-    def __init__(self, **kwargs):
-        kwargs['model_type'] = "base_response"
-        super().__init__(**kwargs)
+    def subject(self):
+        return self['subject']
 
     @property
-    def required_fields(self):
-        return [
-            "successful",
-            "trend_slope_value",
-            "noise_value",
-            "has_seasonality",
-            "health_of_series"
-        ]
+    def series_name(self):
+        return self['series_name']
+
+    @property
+    def result(self):
+        return self['result']
+
+
+
+class EnodoRequest(dict):
+
+    def __init__(self,
+                 series_name: str,
+                 request_type: str,
+                 request_id: Optional[str] = None,
+                 response_output_id: Optional[Any] = None,
+                 config: Optional[SeriesJobConfigModel] = None,
+                 hub_id: Optional[int] = None,
+                 pool_id: Optional[int] = None,
+                 worker_id: Optional[int] = None,
+                 meta: Optional[dict] = None):
+        if request_type not in [
+                REQUEST_TYPE_WORKER, REQUEST_TYPE_HUB, REQUEST_TYPE_EXTERNAL]:
+            raise Exception(f"Invalid EnodoRequest type {request_type}")
+        if config is not None and not isinstance(config, SeriesJobConfigModel):
+            config = SeriesJobConfigModel(**config)
+        super().__init__({
+            'series_name': series_name,
+            'request_id': request_id or str(uuid4()).replace("-", ""),
+            'request_type': request_type,
+            'response_output_id': response_output_id,
+            'config': config,
+            'hub_id': hub_id,
+            'pool_id': pool_id,
+            'worker_id': worker_id,
+            'meta': meta
+        })
+
+    @property
+    def series_name(self) -> str:
+        return self['series_name']
+
+    @property
+    def request_id(self) -> str:
+        return self['request_id']
+
+    @property
+    def request_type(self) -> str:
+        return self['request_type']
+
+    @property
+    def response_output_id(self) -> str:
+        return self['response_output_id']
+
+    @property
+    def config(self) -> SeriesJobConfigModel:
+        return self['config']
+
+    @property
+    def meta(self) -> dict:
+        return self['meta']
+
+
+class EnodoRequestResponse(dict):
+
+    def __init__(self,
+                 series_name,
+                 request_id,
+                 result,
+                 request,
+                 error=None,
+                 meta=None):
+        if not isinstance(request, EnodoRequest):
+            request = EnodoRequest(**request)
+
+        if meta is None:
+            meta = {}
+        super().__init__({
+            'series_name': series_name,
+            'request_id': request_id,
+            'result': result,
+            'request': request,
+            'error': error,
+            'meta': meta
+        })
+
+    @property
+    def series_name(self):
+        return self['series_name']
+
+    @property
+    def request_id(self):
+        return self['request_id']
+
+    @property
+    def request(self) -> EnodoRequest:
+        return self['request']
+
+    @property
+    def result(self):
+        return self['result']
+
+    @property
+    def error(self):
+        return self['error']
+
+    @property
+    def meta(self):
+        return self['meta']

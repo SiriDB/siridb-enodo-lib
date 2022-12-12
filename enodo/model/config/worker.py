@@ -1,37 +1,24 @@
-import json
 
-from . import ConfigModel
+class WorkerConfigModel(dict):
+    def __init__(self, config: dict, job_type_id: list):
 
-WORKER_MODE_GLOBAL = "global"
-WORKER_MODE_DEDICATED_JOB_TYPE = "dedicated_job_type"
-WORKER_MODE_DEDICATED_SERIES = "dedicated_series"
-WORKER_MODES = [WORKER_MODE_GLOBAL, WORKER_MODE_DEDICATED_JOB_TYPE, WORKER_MODE_DEDICATED_SERIES]
+        super(WorkerConfigModel, self).__init__({
+            "config": config,
+            "job_type_id": job_type_id
+        })
 
-class WorkerConfigModel(ConfigModel):
+    @property
+    def config(self):
+        return self.get("config")
 
-    __slots__ = ('mode', 'job_type', 'series')
-    
-    def __init__(self, worker_mode, dedicated_job_type=None, dedicated_series_name=None):
-        if worker_mode not in WORKER_MODES:
-            raise Exception("Invalid worker mode")
+    @config.setter
+    def config(self, value):
+        self["config"] = value
 
-        if worker_mode == WORKER_MODE_DEDICATED_JOB_TYPE and dedicated_job_type is None:
-            raise Exception("Invalid worker config")
+    @property
+    def job_type_id(self):
+        return self.get("job_type_id")
 
-        if worker_mode == WORKER_MODE_DEDICATED_SERIES and dedicated_series_name is None:
-            raise Exception("Invalid worker config")
-
-        self.mode = worker_mode
-        self.job_type = dedicated_job_type
-        self.series = dedicated_series_name
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(**data)
-
-    def to_dict(self):
-        return {
-            'worker_mode': self.mode,
-            'dedicated_job_type': self.job_type,
-            'dedicated_series_name': self.series
-        }
+    @job_type_id.setter
+    def job_type_id(self, value):
+        self["job_type_id"] = value
