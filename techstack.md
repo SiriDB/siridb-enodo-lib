@@ -30,7 +30,7 @@ Full tech stack [here](/techstack.md)
 # Tech Stack File
 ![](https://img.stackshare.io/repo.svg "repo") [SiriDB/siridb-enodo-lib](https://github.com/SiriDB/siridb-enodo-lib)![](https://img.stackshare.io/public_badge.svg "public")
 <br/><br/>
-|8<br/>Tools used|12/27/23 <br/>Report generated|
+|9<br/>Tools used|01/05/24 <br/>Report generated|
 |------|------|
 </div>
 
@@ -106,13 +106,14 @@ Full tech stack [here](/techstack.md)
 </table>
 
 
-## <img src='https://img.stackshare.io/group.svg' /> Open source packages (1)</h2>
+## <img src='https://img.stackshare.io/group.svg' /> Open source packages (2)</h2>
 
-## <img width='24' height='24' src='https://img.stackshare.io/service/12572/-RIWgodF_400x400.jpg'/> PyPI (1)
+## <img width='24' height='24' src='https://img.stackshare.io/service/12572/-RIWgodF_400x400.jpg'/> PyPI (2)
 
 |NAME|VERSION|LAST UPDATED|LAST UPDATED BY|LICENSE|VULNERABILITIES|
 |:------|:------|:------|:------|:------|:------|
 |[pandas](https://pypi.org/project/pandas)|v1.4.2|05/16/22|timoj |BSD-3-Clause|N/A|
+|[statsmodels](https://pypi.org/project/statsmodels)|v0.13.2|04/28/22|timoj |BSD-3-Clause|N/A|
 
 <br/>
 <div align='center'>
